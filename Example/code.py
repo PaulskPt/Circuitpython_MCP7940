@@ -884,7 +884,7 @@ def main():
                 lStart = False
                 clr_scrn()
             else:
-                sys.exit()
+                #sys.exit()
                 say_hello(False)  # Was: False
                 upd_SRAM(state)
         except KeyboardInterrupt:
