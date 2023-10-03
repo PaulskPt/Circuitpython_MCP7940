@@ -175,8 +175,6 @@ class State:
         self.rtc_is_set = False
         self.ntp_datetime = None
         self.dt_str_usa = False
-        self.mcp7940_rtc_is_updated = False
-        self.sys_rtc_is_updated = False
 
 
 RTC_dt = mcp.time
