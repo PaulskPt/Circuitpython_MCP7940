@@ -36,7 +36,6 @@
 import time
 import sys, os, gc
 import board
-# import busio
 import wifi
 import ipaddress
 import socketpool
