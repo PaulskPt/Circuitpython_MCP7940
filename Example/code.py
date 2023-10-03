@@ -147,7 +147,6 @@ if my_debug:
     i2c.unlock()
 
 if use_sh1107:
-    # Addition by @PaulskPt (Github)
     # code for Adafruit OLED 128x128 SH1107
     from adafruit_displayio_sh1107 import SH1107, DISPLAY_OFFSET_ADAFRUIT_128x128_OLED_5297
     # Width, height and rotation for Monochrome 1.12" 128x128 OLED
