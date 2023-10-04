@@ -103,6 +103,14 @@ class State:
         self.ss = 5
         self.wd = 6
         self.yd = 7
+        self.dt_dict = { self.yy: 2023,
+            self.mo: 9,
+            self.dd: 27,
+            self.hh: 21,
+            self.mm: 49,
+            self.ss: 0,
+            self.wd: 2 }
+
 
 state = State()
 
@@ -196,15 +204,8 @@ if use_sh1107:
 
 mcp = mcp7940.MCP7940(i2c)
 
-# Adjust the values of the dt_dict to the actual date and time
+# Adjust the values of the state.dt_dict to the actual date and time
 # Don't forget to enable the state.set_EXT_RTC flag (above)
-dt_dict = { state.yy: 2023,
-            state.mo: 9,
-            state.dd: 27,
-            state.hh: 21,
-            state.mm: 49,
-            state.ss: 0,
-            state.wd: 2 }
 
 def is_NTP(state):
     TAG = tag_adj(state, "is_NTP(): ")
@@ -279,31 +280,32 @@ def set_EXT_RTC(state):
     # We're going to set the external RTC from NTP
     print(TAG+s1+s2+s3)
     print(TAG+"awaiting seconds = 0 ...")    
-    while True:
-        if is_NTP:
-            dt = ntp.datetime
-        else:
-            dt = time.localtime() # state.SYS_dt
-        if dt.tm_sec == 0:
-            print(TAG+f"seconds = {dt.tm_sec}")
-            break   # Line-up to 0 seconds
-        
-    dt_dict = { 
-        state.yy: dt.tm_year,
-        state.mo: dt.tm_mon,
-        state.dd: dt.tm_mday,
-        state.hh: dt.tm_hour,
-        state.mm: dt.tm_min,
-        state.ss: dt.tm_sec,
-        state.wd: dt.tm_wday}
+
+    if is_NTP:
+        dt = ntp.datetime
+    else:
+        dt = time.localtime() # state.SYS_dt
+
+    state.dt_dict[state.yy] = dt.tm_year
+    state.dt_dict[state.mo] = dt.tm_mon
+    state.dt_dict[state.dd] = dt.tm_mday
+    state.dt_dict[state.hh] = dt.tm_hour
+    state.dt_dict[state.mm] = dt.tm_min
+    state.dt_dict[state.ss] = dt.tm_sec
+    state.dt_dict[state.wd] = dt.tm_wday
     
     if not my_debug:
         if is_NTP:
             print(TAG+f"NTP datetime stamp:")
-            print(TAG+"{:d}/{:02d}/{:02d}".format(dt.tm_mon, dt.tm_mday, dt.tm_year))
-            print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(dt.tm_hour, dt.tm_min, dt.tm_sec, dt.tm_wday) )
+            print(TAG+"{:d}/{:02d}/{:02d}".format(
+                state.dt_dict[state.mo], state.dt_dict[state.dd], state.dt_dict[state.yy]))
+            print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(
+                state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], state.dt_dict[state.wd]) )
 
-    dt = (dt_dict[state.yy], dt_dict[state.mo], dt_dict[state.dd], dt_dict[state.hh], dt_dict[state.mm], dt_dict[state.ss], dt_dict[state.wd])
+    dt = (state.dt_dict[state.yy], state.dt_dict[state.mo], state.dt_dict[state.dd], 
+          state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], 
+          state.dt_dict[state.wd])
+    
     if my_debug:
         print(TAG+f"going to set "+eRTC+" for: {dt}")
     mcp.time = dt # Set the external RTC
