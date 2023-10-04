@@ -36,6 +36,7 @@
 import time
 import sys, os, gc
 import board
+# import busio
 import wifi
 import ipaddress
 import socketpool
@@ -147,6 +148,7 @@ if my_debug:
     i2c.unlock()
 
 if use_sh1107:
+    # Addition by @PaulskPt (Github)
     # code for Adafruit OLED 128x128 SH1107
     from adafruit_displayio_sh1107 import SH1107, DISPLAY_OFFSET_ADAFRUIT_128x128_OLED_5297
     # Width, height and rotation for Monochrome 1.12" 128x128 OLED
@@ -224,7 +226,7 @@ def is_INT_RTC():
 
 def set_INT_RTC():
     global set_SYS_RTC, SYS_RTC_is_set
-    TAG = "set_INT_RTC(): "
+    TAG = tag_adj("set_INT_RTC(): ")
     s1 = "Internal (SYS) RTC is set from "
     s2 = "datetime stamp: "
     dt = None
@@ -253,7 +255,7 @@ def set_INT_RTC():
 
 def set_EXT_RTC(state):
     global mcp, RTC_dt, dt_dict, set_EXT_RTC, EXT_RTC_is_set
-    TAG = "set_EXT_RTC(): "
+    TAG = tag_adj("set_EXT_RTC(): ")
     """ called by setup(). Call only when MCP7940 datetime is not correct """
     if not set_EXT_RTC:
         return
@@ -309,7 +311,7 @@ def convert(lst):
 
 def upd_SRAM(state):
     global SYS_dt, use_clr_SRAM
-    TAG = "upd_SRAM(): "
+    TAG = tag_adj("upd_SRAM(): ")
     res = None
     res2 = None
     yrday_old = -1
@@ -883,7 +885,7 @@ def main():
                 lStart = False
                 clr_scrn()
             else:
-                #sys.exit()
+                sys.exit()
                 say_hello(False)  # Was: False
                 upd_SRAM(state)
         except KeyboardInterrupt:
