@@ -103,13 +103,16 @@ class State:
         self.ss = 5
         self.wd = 6
         self.yd = 7
+        self.isdst = 8
         self.dt_dict = { self.yy: 2023,
-            self.mo: 9,
-            self.dd: 27,
-            self.hh: 21,
-            self.mm: 49,
+            self.mo: 10,
+            self.dd: 4,
+            self.hh: 16,
+            self.mm: 10,
             self.ss: 0,
-            self.wd: 2 }
+            self.wd: 2,
+            self.yd: 277,
+            self.isdst: -1}
 
 
 state = State()
@@ -293,22 +296,24 @@ def set_EXT_RTC(state):
     state.dt_dict[state.mm] = dt.tm_min
     state.dt_dict[state.ss] = dt.tm_sec
     state.dt_dict[state.wd] = dt.tm_wday
+    state.dt_dict[state.yd] = mcp.yearday(dt)
+    state.dt_dict[state.isdst] = -1
     
     if not my_debug:
-        if is_NTP:
-            print(TAG+f"NTP datetime stamp:")
-            print(TAG+"{:d}/{:02d}/{:02d}".format(
-                state.dt_dict[state.mo], state.dt_dict[state.dd], state.dt_dict[state.yy]))
-            print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(
-                state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], state.dt_dict[state.wd]) )
+        print(TAG + s2 + f"datetime stamp:")
+        print(TAG+"{:d}/{:02d}/{:02d}".format(
+            state.dt_dict[state.mo], state.dt_dict[state.dd], state.dt_dict[state.yy]))
+        print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}, yearday: {:d}, isdst: {:d}".format(
+            state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], 
+            state.dt_dict[state.wd], state.dt_dict[state.yd], state.dt_dict[state.isdst]) )
 
-    dt = (state.dt_dict[state.yy], state.dt_dict[state.mo], state.dt_dict[state.dd], 
+    dt2 = (state.dt_dict[state.yy], state.dt_dict[state.mo], state.dt_dict[state.dd], 
           state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], 
           state.dt_dict[state.wd])
     
     if my_debug:
-        print(TAG+f"going to set "+eRTC+" for: {dt}")
-    mcp.time = dt # Set the external RTC
+        print(TAG+f"going to set "+eRTC+" for: {dt2}")
+    mcp.time = dt2 # Set the external RTC
     ck_dt = mcp.time # Check it
     if ck_dt and len(ck_dt) >= 7:
         state.EXT_RTC_is_set = True
