@@ -850,8 +850,6 @@ def main():
                 loop_nr = 1
             if my_debug:
                 print(TAG+f"loop nr: {loop_nr}")
-            if state.lStart:
-                state.lStart = False
             if not wifi_is_connected(state):
                 if not my_debug:
                     print(TAG+"going to establish a WiFi connection...")
@@ -889,6 +887,7 @@ def main():
                             pixels.write()
             time.sleep(2)
             if state.lStart:
+                state.lStart = False
                 msg = ['NTP date:', pr_dt(state, True, 0), pr_dt(state, True, 2)]
                 pr_msg(state, msg)
                 upd_SRAM(state)
