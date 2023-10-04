@@ -12,7 +12,7 @@
     I created and tested this script on an Unexpected Maker ESP32S3 FeatherS3 flashed with circuitpython,
     initially versions 8.2.6 and finally 9.0.0-Alpha.1-50.
     This script is also able to send texts to an attached I2C display,
-    in my case an Adafruit 1.12 inch mono OLED 128x128 display (SH1107), but one can use a SSD1306 driven display instead.
+    in my case an Adafruit 1.12 inch mono OLED 128x128 display (SH1107).
 
     Note: since CircuitPython (CPY) V8.x the CPY status_bar is set ON/off in file: boot.py
 
@@ -73,12 +73,13 @@ pixels = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, p
 
 pool = None
 	
-id = board.board_id
+
 
 state = None
 
 class State:
     def __init__(self, saved_state_json=None):
+        self.board_id = None
         self.lStart = True
         self.tag_le_max = 24  # see tag_adj()
         self.use_clr_SRAM = False
@@ -96,7 +97,23 @@ class State:
         self.NTP_dt = None
         self.SYS_dt = None
         self.SRAM_dt = None
+        self.use_neopixel = None
+        self.neopixel_brightness = None
+        self.BLK = None
+        self.RED = None
+        self.GRN = None
+        self.yy = 0
+        self.mo = 1
+        self.dd = 2
+        self.hh = 3
+        self.mm = 4
+        self.ss = 5
+        self.wd = 6
+        self.yd = 7
 
+state = State()
+
+state.board_id = board.board_id
 
 def pr_msg(state, msg_lst=None):
     pass
@@ -113,24 +130,20 @@ if my_debug:
     if wifi is not None:
         print(f"wifi= {type(wifi)}")
 
-# Get env variables from file settings.toml
-ssid = os.getenv("CIRCUITPY_WIFI_SSID")
-pw = os.getenv("CIRCUITPY_WIFI_PASSWORD")
-
 if id == 'unexpectedmaker_feathers3':
-    use_neopixel = True
+    state.use_neopixel = True
     import feathers3
     import neopixel
-    my_brightness = 0.005
-    BLK = 0
-    RED = 1
-    GRN = 200
+    state.neopixel_brightness = 0.005
+    state.BLK = 0
+    state.RED = 1
+    state.GRN = 200
 else:
-    use_neopixel = False
-    my_brightness = None
-    BLK = None
-    RED = None
-    GRN = None
+    state.use_neopixel = False
+    state.neopixel_brightness = None
+    state.BLK = None
+    state.RED = None
+    state.GRN = None
 
 i2c = None
 
@@ -140,6 +153,8 @@ try:
         print(f"i2c: {i2c}")
 except RuntimeError as e:
     # print(f"Error while creating i2c object: {e}")
+    if e:
+        e = None
     raise
 
 if my_debug:
@@ -151,6 +166,8 @@ if my_debug:
         print(f"i2c device address: {hex(n)}")
 
     i2c.unlock()
+    n = None
+    devices = None
 
 if use_sh1107:
     # Addition by @PaulskPt (Github)
@@ -173,27 +190,24 @@ if use_sh1107:
     display_offset=DISPLAY_OFFSET_ADAFRUIT_128x128_OLED_5297,
     rotation=ROTATION,
     )
+    
+    # Cleanup
+    WIDTH = None
+    HEIGHT = None 
+    ROTATION = None
+    BORDER = None
 
 mcp = mcp7940.MCP7940(i2c)
 
-yy = 0
-mo = 1
-dd = 2
-hh = 3
-mm = 4
-ss = 5
-wd = 6
-yd = 7
-
 # Adjust the values of the dt_dict to the actual date and time
 # Don't forget to enable the state.set_EXT_RTC flag (above)
-dt_dict = { yy: 2023,
-            mo: 9,
-            dd: 27,
-            hh: 21,
-            mm: 49,
-            ss: 0,
-            wd: 2 }
+dt_dict = { state.yy: 2023,
+            state.mo: 9,
+            state.dd: 27,
+            state.hh: 21,
+            state.mm: 49,
+            state.ss: 0,
+            state.wd: 2 }
 
 def is_NTP(state):
     TAG = tag_adj(state, "is_NTP(): ")
@@ -231,8 +245,6 @@ def set_INT_RTC(state):
     s1 = "Internal (SYS) RTC is set from "
     s2 = "datetime stamp: "
     dt = None
-    dt1 = None
-    dt2 = None
 
     if is_INT_RTC():
         mRTC.datetime = ntp.datetime
@@ -280,13 +292,13 @@ def set_EXT_RTC(state):
             break   # Line-up to 0 seconds
         
     dt_dict = { 
-        yy: dt.tm_year,
-        mo: dt.tm_mon,
-        dd: dt.tm_mday,
-        hh: dt.tm_hour,
-        mm: dt.tm_min,
-        ss: dt.tm_sec,
-        wd: dt.tm_wday}
+        state.yy: dt.tm_year,
+        state.mo: dt.tm_mon,
+        state.dd: dt.tm_mday,
+        state.hh: dt.tm_hour,
+        state.mm: dt.tm_min,
+        state.ss: dt.tm_sec,
+        state.wd: dt.tm_wday}
     
     if not my_debug:
         if is_NTP:
@@ -294,7 +306,7 @@ def set_EXT_RTC(state):
             print(TAG+"{:d}/{:02d}/{:02d}".format(dt.tm_mon, dt.tm_mday, dt.tm_year))
             print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(dt.tm_hour, dt.tm_min, dt.tm_sec, dt.tm_wday) )
 
-    dt = (dt_dict[yy], dt_dict[mo], dt_dict[dd], dt_dict[hh], dt_dict[mm], dt_dict[ss], dt_dict[wd])
+    dt = (dt_dict[state.yy], dt_dict[state.mo], dt_dict[state.dd], dt_dict[state.hh], dt_dict[state.mm], dt_dict[state.ss], dt_dict[state.wd])
     if my_debug:
         print(TAG+f"going to set "+eRTC+" for: {dt}")
     mcp.time = dt # Set the external RTC
@@ -490,19 +502,21 @@ def setup(state):
     TAG = tag_adj(state, "setup(): ")
     # Create a colour wheel index int
     color_index = 0
+    
+    print(TAG+f"board id: \'{state.board_id}\'")
 
-    if id == 'unexpectedmaker_feathers3':
+    if state.board_id == 'unexpectedmaker_feathers3':
         try:
             # Turn on the power to the NeoPixel
             feathers3.set_ldo2_power(True)
 
-            if use_neopixel:
+            if state.use_neopixel:
                 pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
                 #for i in range(len(pixels)):
                 #    pixels[i] = RED
-                neopixel.NeoPixel.brightness = my_brightness
-                r,g,b = feathers3.rgb_color_wheel( BLK )
-                pixels[0] = ( r, g, b, my_brightness)
+                neopixel.NeoPixel.brightness = state.neopixel_brightness
+                r,g,b = feathers3.rgb_color_wheel( state.BLK )
+                pixels[0] = ( r, g, b, state.neopixel_brightness)
                 pixels.write()
         except ValueError:
             pass
@@ -589,7 +603,7 @@ def setup(state):
                 if state.SYS_dt is not None:
                     print(TAG+s_mcp+" Internal RTC set to: {}, \ntype: {}".format(state.SYS_dt, type(state.SYS_dt)))
                 print(TAG+f"Contents of {s_mcp} External RTC\'s SRAM: {state.SRAM_dt}")
-                print(TAG+f"{s_mcp}_{s_rtc}read from SRAM = {state.SRAM_dt[yy]}")
+                print(TAG+f"{s_mcp}_{s_rtc}read from SRAM = {state.SRAM_dt[state.yy]}")
             else:
                 print(TAG+f"length of tuple state.SRAM_dt = {le}")
         else:
@@ -602,12 +616,12 @@ def get_dt(state):
         if state.lStart:
             while True:
                 dt = mcp.time
-                if dt[ss] == 0: # align for 0 seconds (only at startup)
+                if dt[state.ss] == 0: # align for 0 seconds (only at startup)
                     break
         else:
             dt = mcp.time
         yrday = mcp.yearday(dt)
-        ret = "{} {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}. Day of year: {:>3d}".format(mcp.weekday_S(),dt[yy], dt[mo], dt[dd], dt[hh], dt[mm], dt[ss], yrday)
+        ret = "{} {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}. Day of year: {:>3d}".format(mcp.weekday_S(),dt[state.yy], dt[state.mo], dt[state.dd], dt[state.hh], dt[state.mm], dt[state.ss], yrday)
     
     return ret
 
@@ -668,6 +682,11 @@ def ping_test(state):
 """
 def do_connect(state):
     TAG = tag_adj(state, "do_connect(): ")
+    
+    # Get env variables from file settings.toml
+    ssid = os.getenv("CIRCUITPY_WIFI_SSID")
+    pw = os.getenv("CIRCUITPY_WIFI_PASSWORD")
+    
     try:
         wifi.radio.connect(ssid=ssid, password=pw)
     except ConnectionError as e:
@@ -805,7 +824,7 @@ def say_hello(header):
  * @return None
 """
 def main():
-    state = State()
+    # state = State()
     TAG = tag_adj(state, "main(): ")
     if my_debug:
         print("Waiting another 5 seconds for mu-editor etc. getting ready")
@@ -836,16 +855,17 @@ def main():
                     print(TAG+"going to establish a WiFi connection...")
                 do_connect(state)
             if wifi_is_connected(state):  # Check again.
-                if id == 'unexpectedmaker_feathers3':
-                    if use_neopixel and not grn_set:
+                if state.board_id == 'unexpectedmaker_feathers3':
+                    if state.use_neopixel and not grn_set:
                         grn_set = True
-                        r,g,b = feathers3.rgb_color_wheel( GRN )
-                        pixels[0] = ( r, g, b, my_brightness)
+                        r,g,b = feathers3.rgb_color_wheel( state.GRN )
+                        pixels[0] = ( r, g, b, state.neopixel_brightness)
                         pixels.write()
 
                 if not my_debug:
                     if not ping_done:
-                        print(TAG+f"connected to \"{ssid}\"!") #%s!"%ssid)
+                        ssid = os.getenv("CIRCUITPY_WIFI_SSID")
+                        print(TAG+f"connected to \"{ssid}\"!")
                         print(TAG+f"IP address is {str(wifi.radio.ipv4_address)}")
                         hostname(state)
                         mac(state)
@@ -859,11 +879,11 @@ def main():
                 if not discon_msg_shown:
                     discon_msg_shown = True
                     print(TAG+"WiFi disconnected")
-                    if id == 'unexpectedmaker_feathers3':
+                    if state.board_id  == 'unexpectedmaker_feathers3':
                         if neopixel and not red_set:
                             red_set = True
-                            r,g,b = feathers3.rgb_color_wheel( RED )
-                            pixels[0] = ( r, g, b, my_brightness)
+                            r,g,b = feathers3.rgb_color_wheel( state.RED )
+                            pixels[0] = ( r, g, b, state.neopixel_brightness)
                             pixels.write()
             time.sleep(2)
             if state.lStart:
@@ -879,8 +899,8 @@ def main():
                 upd_SRAM(state)
         except KeyboardInterrupt:
             wifi.radio.stop_station()
-            r,g,b = feathers3.rgb_color_wheel( BLK )
-            pixels[0] = ( r, g, b, my_brightness)
+            r,g,b = feathers3.rgb_color_wheel( state.BLK )
+            pixels[0] = ( r, g, b, state.neopixel_brightness)
             pixels.write()
             print("KeyboardInterrupt. Exiting...")
             sys.exit()
