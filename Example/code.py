@@ -47,7 +47,7 @@ import rtc
 import mcp7940
 # Global flags
 # --- DISPLAY DRTIVER selection flag ----+
-use_sh1107 = False   #                   |
+use_sh1107 = True    #                   |
 # ---------------------------------------+
 use_wifi = True
 use_TAG = True
@@ -101,7 +101,8 @@ class State:
         self.wd = 6
         self.yd = 7
         self.isdst = 8
-        self.dt_dict = { self.yy: 2023,
+        self.dt_dict = { 
+            self.yy: 2023,
             self.mo: 10,
             self.dd: 4,
             self.hh: 16,
@@ -176,7 +177,6 @@ if my_debug:
 
 if use_sh1107:
     displayio.release_displays()
-    # Addition by @PaulskPt (Github)
     # code for Adafruit OLED 128x128 SH1107
     from adafruit_displayio_sh1107 import SH1107, DISPLAY_OFFSET_ADAFRUIT_128x128_OLED_5297
     # Width, height and rotation for Monochrome 1.12" 128x128 OLED
@@ -420,13 +420,13 @@ def pr_dt(state, short, choice):
         choice2 = DT_ALL
 
     now = time.localtime()
-    yy = now[0]
-    mm = now[1]
-    dd = now[2]
-    hh = now[3]
-    mi = now[4]
-    ss = now[5]
-    wd = now[6]
+    yy = now[state.hh]
+    mm = now[state.mo]
+    dd = now[state.dd]
+    hh = now[state.hh]
+    mi = now[state.mm]
+    ss = now[state.ss]
+    wd = now[state.wd]
 
     dow = mcp.DOW[wd]
 
