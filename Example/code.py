@@ -21,7 +21,7 @@
     Update October 2023:
 
     The script tries to establish WiFi and when successfull it will fetch a datetime stamp from the Adafruit NTP server.
-    Depending of the global boolean variables: 'set_SYS_RTC' and 'set_EXT_RTC', the internal and/or the external RTC(s)
+    Depending of the global boolean variables: 'state.set_SYS_RTC' and 'state.set_EXT_RTC', the internal and/or the external RTC(s)
     is/are set.
 
     The external MCP7940 RTC timekeeping set values will be read frequently.
@@ -55,11 +55,7 @@ use_wifi = True
 use_TAG = True
 my_debug = False  # Set to True if you need debug output to REPL
 use_ping = True
-use_clr_SRAM = False
-set_SYS_RTC = True
-SYS_RTC_is_set = False
-set_EXT_RTC = True # Set to True to update the MCP7940 RTC datetime values (and set the values of dt_dict below)
-EXT_RTC_is_set = False
+
 
 mRTC = rtc.RTC()  # create internal RTC object
 if my_debug:
@@ -67,12 +63,7 @@ if my_debug:
 
 import adafruit_ntp
 pool = socketpool.SocketPool(wifi.radio)
-ntp = adafruit_ntp.NTP(pool, tz_offset=1)  # tz_offset utc+1
-try:
-    ntp_dt = ntp.datetime
-    # print(f"\nntp.datetime: {ntp.datetime}")
-except OSError as e:
-    print(f"\nError while trying to set microcontroller\'s RTC: {e}")
+ntp = adafruit_ntp.NTP(pool, tz_offset=1)  
 
 displayio.release_displays()
 
@@ -80,20 +71,34 @@ displayio.release_displays()
 # Brightness of 0.3 is ample for the 1515 sized LED
 pixels = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.RGB)
 
-start = True
-ap_dict = {} # dictionary of WiFi access points
-ap_cnt = 0
-ip = None
-s_ip = None
-le_s_ip = 0
-tz_offset = 0
-tag_le_max = 24  # see tag_adj()
-
 pool = None
 	
 id = board.board_id
 
-def pr_msg(msg_lst=None):
+state = None
+
+class State:
+    def __init__(self, saved_state_json=None):
+        self.lStart = True
+        self.tag_le_max = 24  # see tag_adj()
+        self.use_clr_SRAM = False
+        self.set_SYS_RTC = True
+        self.NTP_dt_is_set = False
+        self.SYS_RTC_is_set = False
+        self.set_EXT_RTC = True # Set to True to update the MCP7940 RTC datetime values (and set the values of dt_dict below)
+        self.EXT_RTC_is_set = False
+        self.dt_str_usa = True
+        self.SYS_dt = None # time.localtime()
+        self.SRAM_dt = None  #see setup()
+        self.ip = None
+        self.s__ip = None
+        self.mac = None
+        self.NTP_dt = None
+        self.SYS_dt = None
+        self.SRAM_dt = None
+
+
+def pr_msg(state, msg_lst=None):
     pass
 
 if my_debug:
@@ -102,7 +107,7 @@ if my_debug:
     print("waiting 5 seconds...")
     time.sleep(5)
     msg = ["MCP7940 and SH1107 tests", "for board:", "\'"+id+"\'"]
-    pr_msg(msg)
+    pr_msg(state, msg)
 
 if my_debug:
     if wifi is not None:
@@ -171,19 +176,6 @@ if use_sh1107:
 
 mcp = mcp7940.MCP7940(i2c)
 
-class State:
-    def __init__(self, saved_state_json=None):
-        self.rtc_is_set = False
-        self.ntp_datetime = None
-        self.dt_str_usa = True
-
-
-RTC_dt = mcp.time
-if my_debug:
-    print(f"startup: global var RTC_dt set from MCP7940 datetime: {RTC_dt}")
-SYS_dt = time.localtime()
-SRAM_dt = None  #see setup()
-
 yy = 0
 mo = 1
 dd = 2
@@ -194,7 +186,7 @@ wd = 6
 yd = 7
 
 # Adjust the values of the dt_dict to the actual date and time
-# Don't forget to enable the set_EXT_RTC flag (above)
+# Don't forget to enable the state.set_EXT_RTC flag (above)
 dt_dict = { yy: 2023,
             mo: 9,
             dd: 27,
@@ -203,13 +195,19 @@ dt_dict = { yy: 2023,
             ss: 0,
             wd: 2 }
 
-def is_NTP():
+def is_NTP(state):
+    TAG = tag_adj(state, "is_NTP(): ")
     ret = False
     dt = None
     try:
         if ntp is not None:
-            dt = ntp.datetime
-        ret = True if dt is not None else False
+            if not state.NTP_dt_is_set:
+                dt = ntp.datetime
+            state.NTP_dt = dt
+            if my_debug:
+                print(TAG+f"state.NTP_dt: {state.NTP_dt}")
+            state.NTP_dt_is_set = True
+            ret = True if dt is not None else False
     except OSError as e:
         print(f"is_NTP() error: {e}")
     return ret
@@ -224,81 +222,90 @@ def is_INT_RTC():
         return True
     return False
 
-def set_INT_RTC():
-    global set_SYS_RTC, SYS_RTC_is_set
-    TAG = tag_adj("set_INT_RTC(): ")
+def set_INT_RTC(state):
+    global mRTC
+    if not state.set_SYS_RTC:
+        return
+    
+    TAG = tag_adj(state, "set_INT_RTC(): ")
     s1 = "Internal (SYS) RTC is set from "
     s2 = "datetime stamp: "
     dt = None
     dt1 = None
     dt2 = None
 
-    if not set_SYS_RTC:
-        return
-
     if is_INT_RTC():
         mRTC.datetime = ntp.datetime
-        dt = mRTC.datetime
-        #print(TAG+f"dt: {dt}")
-        if dt.tm_year >= 2000:
-             print(TAG+s1+"NTP service "+s2) # +f"{dt}")
-    elif EXT_RTC_is_set:
-        dt = mcp.time
-        if dt is not None:
-            if dt.tm_year >= 2000:
-                print(TAG+s1+"External RTC"+s2) # +f"{dt}")
-
+        state.SYS_dt = mRTC.datetime
+        #print(TAG+f"state.SYS_dt: {state.SYS_dt}")
+        state.SYS_RTC_is_set = True
+        if state.SYS_dt.tm_year >= 2000:
+             print(TAG+s1+"NTP service "+s2) # +f"{state.SYS_dt}")
+    elif state.EXT_RTC_is_set:
+        mRTC = mcp.time
+        state.SYS_RTC_is_set = True
+        state.SYS_dt = mRTC.datetime
+        if state.SYS_dt is not None:
+            if state.SYS_dt.tm_year >= 2000:
+                print(TAG+s1+"External RTC"+s2) # +f"{state.SYS_dt}")
+    dt = state.SYS_dt
     if not my_debug:
         print(TAG+"{:d}/{:02d}/{:02d}".format(dt.tm_mon, dt.tm_mday, dt.tm_year))
         print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(dt.tm_hour, dt.tm_min, dt.tm_sec, dt.tm_wday) )
 
 
 def set_EXT_RTC(state):
-    global mcp, RTC_dt, dt_dict, set_EXT_RTC, EXT_RTC_is_set
-    TAG = tag_adj("set_EXT_RTC(): ")
+    global mcp, dt_dict
+    TAG = tag_adj(state, "set_EXT_RTC(): ")
+    eRTC = "External RTC (MCP7940) "
+    s1 = "We\'re going to use "
+    s2 = "NTP " if is_NTP else "INT RTC "
+    s3 = "to set the EXT RTC"
+    
     """ called by setup(). Call only when MCP7940 datetime is not correct """
-    if not set_EXT_RTC:
+    
+    if not state.set_EXT_RTC:
         return
 
-    if is_NTP:
-        # We're going to set the external RTC from NTP
-        print(TAG+"We\'re going to use NTP to set the EXT RTC")
-        dt = ntp.datetime
-        dt_dict = { yy: dt.tm_year,
-            mo: dt.tm_mon,
-            dd: dt.tm_mday,
-            hh: dt.tm_hour,
-            mm: dt.tm_min,
-            ss: dt.tm_sec,
-            wd: dt.tm_wday}
-
-        if not my_debug:
+    # We're going to set the external RTC from NTP
+    print(TAG+s1+s2+s3)
+    print(TAG+"awaiting seconds = 0 ...")    
+    while True:
+        if is_NTP:
+            dt = ntp.datetime
+        else:
+            dt = time.localtime() # state.SYS_dt
+        if dt.tm_sec == 0:
+            print(TAG+f"seconds = {dt.tm_sec}")
+            break   # Line-up to 0 seconds
+        
+    dt_dict = { 
+        yy: dt.tm_year,
+        mo: dt.tm_mon,
+        dd: dt.tm_mday,
+        hh: dt.tm_hour,
+        mm: dt.tm_min,
+        ss: dt.tm_sec,
+        wd: dt.tm_wday}
+    
+    if not my_debug:
+        if is_NTP:
             print(TAG+f"NTP datetime stamp:")
             print(TAG+"{:d}/{:02d}/{:02d}".format(dt.tm_mon, dt.tm_mday, dt.tm_year))
             print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(dt.tm_hour, dt.tm_min, dt.tm_sec, dt.tm_wday) )
-    else:
-        if my_debug:
-            print(TAG+f"SYS_dt.tm_year: {SYS_dt.tm_year}")
-        if SYS_dt.tm_year == 2023:  # SYS_dt is set by NTP datetime stamp (very accurate)
-            dt_dict = { yy: SYS_dt.tm_year,
-                mo: SYS_dt.tm_mon,
-                dd: SYS_dt.tm_mday,
-                hh: SYS_dt.tm_hour,
-                mm: SYS_dt.tm_min,
-                ss: SYS_dt.tm_sec,
-                wd: SYS_dt.tm_wday}
 
     dt = (dt_dict[yy], dt_dict[mo], dt_dict[dd], dt_dict[hh], dt_dict[mm], dt_dict[ss], dt_dict[wd])
-    if not my_debug:
-        print(TAG+f"going to set MCP7940 for: {dt}")
-    mcp.time = dt
-
-
-    ck_dt = mcp.time
+    if my_debug:
+        print(TAG+f"going to set "+eRTC+" for: {dt}")
+    mcp.time = dt # Set the external RTC
+    ck_dt = mcp.time # Check it
     if ck_dt and len(ck_dt) >= 7:
-        EXT_RTC_is_set = True
+        state.EXT_RTC_is_set = True
+        state.SRAM_dt = ck_dt
         if not my_debug:
-            print(TAG+f"MCP7940 RTC updated to: {mcp.time}")
+            print(TAG+eRTC+f"updated to: {ck_dt}")
+    else:
+        state.SRAM_dt = ()
 
 # Convert a list to a tuple
 def convert(lst):
@@ -310,19 +317,19 @@ def convert(lst):
         return lst  # return an empty tuple
 
 def upd_SRAM(state):
-    global SYS_dt, use_clr_SRAM
-    TAG = tag_adj("upd_SRAM(): ")
+    global SYS_dt
+    TAG = tag_adj(state, "upd_SRAM(): ")
     res = None
     res2 = None
     yrday_old = -1
     yrday_new = -1
-    if use_clr_SRAM:
+    if state.use_clr_SRAM:
         if my_debug:
             print(TAG+"First we go to clear the SRAM data space")
         mcp.clr_SRAM()
     else:
         if my_debug:
-            print(TAG+"We\'re not going to clear SRAM. See global var \'use_clr_SRAM\'")
+            print(TAG+"We\'re not going to clear SRAM. See global var \'state.use_clr_SRAM\'")
     tm = time.localtime()
     mcp.show_SRAM() # Show the values in the cleared SRAM space
     if my_debug:
@@ -373,11 +380,11 @@ def upd_SRAM(state):
 
 
         msg = ["Read from SRAM:", dt1, dt2, dt3, dt4, dt5]
-        pr_msg( msg)
+        pr_msg(state, msg)
 
 
 def pr_dt(state, short, choice):
-    TAG = tag_adj("pr_dt(): ")
+    TAG = tag_adj(state, "pr_dt(): ")
     DT_DATE_L = 0
     DT_DATE_S = 1
     DT_TIME = 2
@@ -453,13 +460,17 @@ def pr_dt(state, short, choice):
  *
  * @return boolean. True if exists an ip address. False if not.
 """
-def wifi_is_connected():
-    ip = wifi.radio.ipv4_address
-    if ip is None:
+def wifi_is_connected(state):
+    if state.ip is not None:
+        my_ip = state.ip
+    else:
+        my_ip = wifi.radio.ipv4_address
+        
+    if my_ip is None:
         return False
     else:
-        s__ip = str(ip)
-        return True if s__ip is not None and len(s__ip) > 0 and s__ip != '0.0.0.0' else False
+        my_s__ip = str(my_ip)
+        return True if my_s__ip is not None and len(my_s__ip) > 0 and my_s__ip != '0.0.0.0' else False
 
 def clr_scrn():
     for i in range(9):
@@ -475,8 +486,8 @@ def clr_scrn():
  * @return None
 """
 def setup(state):
-    global pixels, my_brightness, set_EXT_RTC , set_SYS_RTC, mRTC, SRAM_dt, RTC_dt, SYS_dt
-    TAG = tag_adj("setup(): ")
+    global pixels, my_brightness, mRTC, SRAM_dt, SYS_dt
+    TAG = tag_adj(state, "setup(): ")
     # Create a colour wheel index int
     color_index = 0
 
@@ -498,20 +509,15 @@ def setup(state):
 
     wifi.AuthMode.WPA2   # set only once
 
-    if not mcp.is_started():
-        if my_debug:
-            print(TAG+"Going to start the RTC\'s MCP oscillator")
-        mcp.start() # Start MCP oscillator
-
-    if is_NTP():
+    if is_NTP(state):
         print(TAG+"We have NTP")
     if is_INT_RTC():
         print(TAG+"We have an internal RTC")
-        if SYS_RTC_is_set:
+        if state.SYS_RTC_is_set:
             print(TAG+"and the internal RTC is set from an NTP server")
     if is_EXT_RTC:
         print(TAG+"We have an external RTC")
-        if EXT_RTC_is_set:
+        if state.EXT_RTC_is_set:
             print(TAG+"and the external RTC is set from an NTP server")
 
 
@@ -564,61 +570,46 @@ def setup(state):
     else:
         if my_debug:
             print(TAG+f"{s_en2}{s_bbe_yn}")
-
-    SRAM_dt = convert( mcp.read_fm_SRAM() )
-    # print(TAG+f"SRAM_dt: {SRAM_dt}. type(SRAM_dt): {type(SRAM_dt)}. len(SRAM_dt): {len(SRAM_dt)}")
-    if isinstance(SRAM_dt, tuple):
-        le = len(SRAM_dt)
-        if le > 0:
-            if my_debug:
-                print(TAG+"SYS_dt (= time.localtime() ) \nresult: {}, type: {}".format(SYS_dt, type(SYS_dt)))
-                print(TAG+s_mcp+"RTC currently set to: {}, \ntype: {}".format(RTC_dt, type(RTC_dt)))
-
-                print(TAG+f"Contents of {s_mcp} RTC\'s SRAM: {SRAM_dt}")
-                print(TAG+f"Microcontroller (time.localtime()) year   = {SYS_dt[yy]}")
-                print(TAG+f"{s_mcp}_{s_rtc}               = {RTC_dt[yy]}")
-                print(TAG+f"{s_mcp}_{s_rtc}read from SRAM = {SRAM_dt[yy]}")
-            if SYS_dt[yy] == 2000:  # SYS_dt is updated from internet NTP source
-                if RTC_dt[yy] >= 2020:
-                    if is_EXT_RTC():
-                        set_EXT_RTC  = True
-                elif SRAM_dt[yy] >= 2020:
-                    if is_EXT_RTC():
-                        set_EXT_RTC  = True
-                        use_SRAM_dt = True
-            elif SYS_dt[yy] != SRAM_dt[yy]:
-                if is_INT_RTC():
-                    set_SYS_RTC = True
-        else:
-            if my_debug:
-                print(TAG+f"length of tuple SRAM_dt = {le}")
-    else:
-        if my_debug:
-            print(TAG+f"Expected type list but got type: {type(SRAM_dt)}")
-
-    if set_SYS_RTC :
+            
+    if state.set_SYS_RTC :
         if my_debug:
             print(TAG+"Going to set internal (SYS) RTC")
-        set_INT_RTC()
-        #update_mRTC()
+        set_INT_RTC(state)
 
-    if set_EXT_RTC:
+    if state.set_EXT_RTC:
         set_EXT_RTC(state)
 
-def get_dt():
-    global lStart
-    dt = None
-    if lStart:
-        lStart = False
-        while True:
-            dt = mcp.time
-            if dt[ss] == 0: # align for 0 seconds (only at startup)
-                break
-    else:
-        dt = mcp.time
-    yrday = mcp.yearday(dt)
+    state.SRAM_dt = convert( mcp.read_fm_SRAM() )
+    # print(TAG+f"SRAM_dt: {SRAM_dt}. type(SRAM_dt): {type(SRAM_dt)}. len(SRAM_dt): {len(SRAM_dt)}")
+    
+    if my_debug:
+        if isinstance(state.SRAM_dt, tuple):
+            le = len(state.SRAM_dt)
+            if le > 0:
+                if state.SYS_dt is not None:
+                    print(TAG+s_mcp+" Internal RTC set to: {}, \ntype: {}".format(state.SYS_dt, type(state.SYS_dt)))
+                print(TAG+f"Contents of {s_mcp} External RTC\'s SRAM: {state.SRAM_dt}")
+                print(TAG+f"{s_mcp}_{s_rtc}read from SRAM = {state.SRAM_dt[yy]}")
+            else:
+                print(TAG+f"length of tuple state.SRAM_dt = {le}")
+        else:
+            print(TAG+f"Expected type tuple but got type: {type(state.SRAM_dt)}")
 
-    return "{} {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}. Day of year: {:>3d}".format(mcp.weekday_S(),dt[yy], dt[mo], dt[dd], dt[hh], dt[mm], dt[ss], yrday)
+def get_dt(state):
+    dt = None
+    ret = ""
+    if is_EXT_RTC():
+        if state.lStart:
+            while True:
+                dt = mcp.time
+                if dt[ss] == 0: # align for 0 seconds (only at startup)
+                    break
+        else:
+            dt = mcp.time
+        yrday = mcp.yearday(dt)
+        ret = "{} {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}. Day of year: {:>3d}".format(mcp.weekday_S(),dt[yy], dt[mo], dt[dd], dt[hh], dt[mm], dt[ss], yrday)
+    
+    return ret
 
 
 """
@@ -628,15 +619,16 @@ def get_dt():
  *
  * @return None
 """
-def ping_test():
+def ping_test(state):
     global pool
-    TAG = tag_adj("ping_test(): ")
-    ip = wifi.radio.ipv4_address
-    s__ip = str(ip)
-    ret = False
+    TAG = tag_adj(state, "ping_test(): ")
+    #state.ip = wifi.radio.ipv4_address
+    if state.ip is not None and state.ip != 0:
+        # state.s__ip = str(state.ip)
+        ret = False
 
     if my_debug:
-        print(TAG+f"s_ip= \'{s__ip}\'")
+        print(TAG+f"state.s__ip= \'{state.s__ip}\'")
 
     if use_ping:
         try:
@@ -674,9 +666,8 @@ def ping_test():
  *
  * @return None
 """
-def do_connect():
-    global ip, s_ip, le_s_ip, start
-    TAG = tag_adj("do_connect(): ")
+def do_connect(state):
+    TAG = tag_adj(state, "do_connect(): ")
     try:
         wifi.radio.connect(ssid=ssid, password=pw)
     except ConnectionError as e:
@@ -684,11 +675,11 @@ def do_connect():
     except Exception as e:
         print(TAG+f"Error: {dir(e)}")
 
-    ip = wifi.radio.ipv4_address
+    state.ip = wifi.radio.ipv4_address
 
-    if ip:
-        s_ip = str(ip)
-        le_s_ip = len(s_ip)
+    if state.ip:
+        state.s__ip = str(state.ip)
+
 
 """
  * @brief function print hostname to REPL
@@ -697,8 +688,8 @@ def do_connect():
  *
  * @return None
 """
-def hostname():
-    TAG = tag_adj("hostname(): ")
+def hostname(state):
+    TAG = tag_adj(state, "hostname(): ")
     print(TAG+f"wifi.radio.hostname= \'{wifi.radio.hostname}\'")
 
 """
@@ -708,8 +699,8 @@ def hostname():
  *
  * @return None
 """
-def mac():
-    TAG = tag_adj("mac(): ")
+def mac(state):
+    TAG = tag_adj(state, "mac(): ")
     mac = wifi.radio.mac_address
     le = len(mac)
     if le > 0:
@@ -722,7 +713,7 @@ def mac():
                 print("{:x}".format(mac[_]), end='')
         print('', end='\n')
 
-def tag_adj(t):
+def tag_adj(state,t):
     global tag_le_max
 
     if use_TAG:
@@ -733,15 +724,15 @@ def tag_adj(t):
         if isinstance(t, str):
             le = len(t)
         if le >0:
-            spc = tag_le_max - le
+            spc = state.tag_le_max - le
             #print(f"spc= {spc}")
             ret = ""+t+"{0:>{1:d}s}".format("",spc)
             #print(f"s=\'{s}\'")
         return ret
     return ""
 
-def pr_msg(msg_lst=None):
-    # TAG = tag_adj("pr_msg(): ")
+def pr_msg(state, msg_lst=None):
+    # TAG = tag_adj(state, "pr_msg(): ")
     if msg_lst is None:
         msg_lst = ["pr_msg", "test message", "param rcvd:", "None"]
     le = len(msg_lst)
@@ -814,9 +805,8 @@ def say_hello(header):
  * @return None
 """
 def main():
-    global start
     state = State()
-    TAG = tag_adj("main(): ")
+    TAG = tag_adj(state, "main(): ")
     if my_debug:
         print("Waiting another 5 seconds for mu-editor etc. getting ready")
     time.sleep(5)
@@ -830,7 +820,7 @@ def main():
     red_set = False
     count_tried = 0
     count_tried_max = 10
-    lStart = True
+    state.lStart = True
     loop_nr = 0
     while True:
         try:
@@ -839,13 +829,13 @@ def main():
                 loop_nr = 1
             if my_debug:
                 print(TAG+f"loop nr: {loop_nr}")
-            if start:
-                start = False
-            if not wifi_is_connected():
+            if state.lStart:
+                state.lStart = False
+            if not wifi_is_connected(state):
                 if not my_debug:
                     print(TAG+"going to establish a WiFi connection...")
-                do_connect()
-            if wifi_is_connected():  # Check again.
+                do_connect(state)
+            if wifi_is_connected(state):  # Check again.
                 if id == 'unexpectedmaker_feathers3':
                     if use_neopixel and not grn_set:
                         grn_set = True
@@ -857,9 +847,9 @@ def main():
                     if not ping_done:
                         print(TAG+f"connected to \"{ssid}\"!") #%s!"%ssid)
                         print(TAG+f"IP address is {str(wifi.radio.ipv4_address)}")
-                        hostname()
-                        mac()
-                        ping_done = ping_test()
+                        hostname(state)
+                        mac(state)
+                        ping_done = ping_test(state)
                         if not ping_done:
                             count_tried += 1
                             if count_tried >= count_tried_max:
@@ -876,13 +866,12 @@ def main():
                             pixels[0] = ( r, g, b, my_brightness)
                             pixels.write()
             time.sleep(2)
-            if lStart:
+            if state.lStart:
                 msg = ['NTP date:', pr_dt(state, True, 0), pr_dt(state, True, 2)]
-                pr_msg( msg)
-                use_SRAM_dt = False
+                pr_msg(state, msg)
                 upd_SRAM(state)
                 say_hello(True)
-                lStart = False
+                state.lStart = False
                 clr_scrn()
             else:
                 #sys.exit()
