@@ -397,8 +397,8 @@ class MCP7940:
         return ndays
     
     def _is_pwr_failure(self):
-        time_reg = bytearray(1)  # added by @PaulskPt
-        time_reg[0] = self.reg_settings._pwr_fail
+        time_reg = bytearray()  # added by @PaulskPt
+        time.reg.append(REGISTER_PWR_FAIL)
         if my_debug:
             print(f"_is_pwr_failure(): state power failure register: {time_reg}")
         
@@ -728,27 +728,30 @@ class MCP7940:
         def __init__(self, i2c, address):
             self._i2c = i2c
             self._address = address
-            self._memory_start = 0x20
+            self._memory_start = SRAM_START_ADDRESS
             #self._memory_start = const(0x20)
 
         def __getitem__(self, key):
+            
+            reg_buf = bytearray()
+            reg_buf.append(self._memory_start)
             
             get_byte = bytearray(1)
             
             try:
             
-                #while not self._i2c.try_lock():
-                #    pass
+                while not self._i2c.try_lock():
+                    pass
                 
                 # get_byte = lambda x: self._i2c.readfrom_mem(self._address, x + self._memory_start, 1)(x)
                 #get_byte = lambda x: self._i2c.readfrom_into(self._memory_start + x, get_byte)(x)
-                get_byte = lambda x: (self.reg_settings._sram + x, get_byte)(x)
+                get_byte = lambda x: (self._i2c.writeto_then_readfrom(self.memory_start + x, get_byte), get_byte)(x)
                 print(f"Data._getitem_(): get_byte: {get_byte}")
             except OSError as e:
                 print(f"Data.__getitem__(): Error {e}")
             finally:
-                #self._i2c.unlock()
-                pass
+                self._i2c.unlock()
+                #pass
             
             if type(key) is int:
                 if my_debug:
@@ -770,14 +773,3 @@ class MCP7940:
                     print('start: {} stop: {} step: {}'.format(key.start, key.stop, key.step))
             if my_debug:
                 print(value)
-
-
-    
-
-            
-    
-    
-    
-    
-    
-    
