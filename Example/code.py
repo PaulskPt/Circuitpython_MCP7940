@@ -36,7 +36,6 @@
 import time
 import sys, os, gc
 import board
-# import busio
 import wifi
 import ipaddress
 import socketpool
@@ -48,7 +47,7 @@ import rtc
 import mcp7940
 # Global flags
 # --- DISPLAY DRTIVER selection flag ----+
-use_sh1107 = True    #                   |
+use_sh1107 = False   #                   |
 # ---------------------------------------+
 use_wifi = True
 use_TAG = True
@@ -63,8 +62,6 @@ if my_debug:
 import adafruit_ntp
 pool = socketpool.SocketPool(wifi.radio)
 ntp = adafruit_ntp.NTP(pool, tz_offset=1)  
-
-displayio.release_displays()
 
 pool = None
 
@@ -178,6 +175,7 @@ if my_debug:
     devices = None
 
 if use_sh1107:
+    displayio.release_displays()
     # Addition by @PaulskPt (Github)
     # code for Adafruit OLED 128x128 SH1107
     from adafruit_displayio_sh1107 import SH1107, DISPLAY_OFFSET_ADAFRUIT_128x128_OLED_5297
