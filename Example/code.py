@@ -8,7 +8,7 @@
     This CircuitPython script is created to show how I managed to:
     a) read the values of the registers (e.g.: timekeeping data) from an Unexpected Maker MCP7940 RTC board;
     b) write and read timekeeping data to and from the MCP7940's user SRAM space.
-    
+
     I created and tested this script on an Unexpected Maker ESP32S3 FeatherS3 flashed with circuitpython,
     initially versions 8.2.6 and finally 9.0.0-Alpha.1-50.
     This script is also able to send texts to an attached I2C display,
@@ -175,7 +175,7 @@ class State:
     def __init__(self, saved_state_json=None):
         self.rtc_is_set = False
         self.ntp_datetime = None
-        self.dt_str_usa = False
+        self.dt_str_usa = True
 
 
 RTC_dt = mcp.time
@@ -502,7 +502,7 @@ def setup(state):
         if my_debug:
             print(TAG+"Going to start the RTC\'s MCP oscillator")
         mcp.start() # Start MCP oscillator
-    
+
     if is_NTP():
         print(TAG+"We have NTP")
     if is_INT_RTC():
@@ -514,7 +514,7 @@ def setup(state):
         if EXT_RTC_is_set:
             print(TAG+"and the external RTC is set from an NTP server")
 
- 
+
     s_mcp = "MCP7940"
     s_pf1 = s_mcp+" Power failed"
     s_en1 = s_mcp+" RTC battery "
@@ -596,7 +596,7 @@ def setup(state):
         if my_debug:
             print(TAG+f"Expected type list but got type: {type(SRAM_dt)}")
 
-    if set_SYS_RTC : 
+    if set_SYS_RTC :
         if my_debug:
             print(TAG+"Going to set internal (SYS) RTC")
         set_INT_RTC()
@@ -880,12 +880,12 @@ def main():
                 msg = ['NTP date:', pr_dt(state, True, 0), pr_dt(state, True, 2)]
                 pr_msg( msg)
                 use_SRAM_dt = False
-                upd_SRAM(state) 
+                upd_SRAM(state)
                 say_hello(True)
                 lStart = False
                 clr_scrn()
             else:
-                sys.exit()
+                #sys.exit()
                 say_hello(False)  # Was: False
                 upd_SRAM(state)
         except KeyboardInterrupt:

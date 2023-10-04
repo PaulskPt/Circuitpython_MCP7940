@@ -1,0 +1,80 @@
+Wednesay 2023-10-04 11h38 utc+1
+
+
+Board: Unexpected Maker ESP32S3 FeatherS3
+with Adafruit CircuitPython 9.0.0-alpha.1-50-gaa0d7aad83 
+IDE: mu-editor v1.2.0
+
+Scripts: code.py and mcp9740.py 
+
+
+REPL output:
+
+soft reboot
+
+Auto-reload is on. Simply save files over USB to run them or enter REPL to disable.
+code.py output:
+setup():                We have NTP
+setup():                We have an internal RTC
+setup():                We have an external RTC
+set_INT_RTC():          Internal (SYS) RTC is set from NTP service datetime stamp: 
+set_INT_RTC():          10/04/2023
+set_INT_RTC():          11:38:35 weekday: 2
+set_EXT_RTC():          We're going to use NTP to set the EXT RTC
+set_EXT_RTC():          NTP datetime stamp:
+set_EXT_RTC():          10/04/2023
+set_EXT_RTC():          11:38:35 weekday: 2
+set_EXT_RTC():          going to set MCP7940 for: (2023, 10, 4, 11, 38, 35, 2)
+set_EXT_RTC():          MCP7940 RTC updated to: (2023, 10, 4, 11, 38, 35, 2, 277, -1)
+main():                 connected to "xxxxx"!
+main():                 IP address is 192.168.x.yyy
+hostname():             wifi.radio.hostname= 'UMFeatherS3'
+mac():                  wifi.radio.mac_address= 84:f7:3:c0:65:40
+ping_test():            Resolved google address: '142.250.200.142'
+ping_test():            Ping google.com [142.250.200.142]: 17 ms
+
+
+
+
+
+
+
+
+
+NTP date:
+Wed 10/04/2023
+11:38:37 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/04
+11:38:40
+wkday: Wednesday
+yrday: 277
+dst: -1
+
+
+KeyboardInterrupt. Exiting...
+
+Code done running.
+
+Press any key to enter the REPL. Use CTRL-D to reload.
