@@ -279,8 +279,7 @@ def set_EXT_RTC(state):
         return
 
     # We're going to set the external RTC from NTP
-    print(TAG+s1+s2+s3)
-    print(TAG+"awaiting seconds = 0 ...")    
+    print(TAG+s1+s2+s3)  
 
     if is_NTP:
         dt = ntp.datetime
