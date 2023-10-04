@@ -47,8 +47,7 @@ import feathers3
 import rtc
 import mcp7940
 # Global flags
-# --- DISPLAY DRTIVER selection flags ---+
-use_ssd1306 = False  #                   |
+# --- DISPLAY DRTIVER selection flag ----+
 use_sh1107 = True    #                   |
 # ---------------------------------------+
 use_wifi = True
@@ -67,13 +66,7 @@ ntp = adafruit_ntp.NTP(pool, tz_offset=1)
 
 displayio.release_displays()
 
-# Create a NeoPixel instance
-# Brightness of 0.3 is ample for the 1515 sized LED
-pixels = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.RGB)
-
 pool = None
-	
-
 
 state = None
 
@@ -123,22 +116,26 @@ if my_debug:
     print(f"MCP7940 and SH1107 tests for board: \'{id}\'") # Unexpected Maker FeatherS3")
     print("waiting 5 seconds...")
     time.sleep(5)
-    msg = ["MCP7940 and SH1107 tests", "for board:", "\'"+id+"\'"]
+    msg = ["MCP7940 and SH1107 tests", "for board:", "\'"+state.board_id+"\'"]
     pr_msg(state, msg)
 
 if my_debug:
     if wifi is not None:
         print(f"wifi= {type(wifi)}")
 
-if id == 'unexpectedmaker_feathers3':
+if state.board_id == 'unexpectedmaker_feathers3':
     state.use_neopixel = True
     import feathers3
     import neopixel
+    # Create a NeoPixel instance
+    # Brightness of 0.3 is ample for the 1515 sized LED
+    pixels = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.RGB)
     state.neopixel_brightness = 0.005
     state.BLK = 0
     state.RED = 1
     state.GRN = 200
 else:
+    pixels = None
     state.use_neopixel = False
     state.neopixel_brightness = None
     state.BLK = None
@@ -503,7 +500,7 @@ def setup(state):
     # Create a colour wheel index int
     color_index = 0
     
-    print(TAG+f"board id: \'{state.board_id}\'")
+    print(TAG+f"board: \'{state.board_id}\'")
 
     if state.board_id == 'unexpectedmaker_feathers3':
         try:
