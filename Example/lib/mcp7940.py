@@ -887,7 +887,7 @@ class MCP7940:
         return t3
     
     def pwr_updn_dt(self, pwr_updn=True): # power up is default
-        TAG="get_pwr_up_dt(): "
+        TAG="get_pwr_up_dt():         "
         reg_buf = bytearray()
         if pwr_updn:
             reg_buf.append(MCP7940.PWRUP_ADDRESS)
@@ -918,6 +918,16 @@ class MCP7940:
             print(TAG+f"reg_filter: {reg_filter}")
         t = [self.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
 
+        # extract 12/24  flag (True = 12, False = 24)
+        _12hr = t[MCP7940.PWRMIN] & 0x40 # (0x40 = 0100 0000)
+        _12hr = _12hr >> 6 # move b01000000 to b00000001
+        # print(TAG+"{:s} hour format".format("12" if _12hr else "24")))
+        # AM/PM flag (True = PM, False = AM)
+        _AMPM = t[MCP7940.PWRMIN] & 0x20 # (0x20 = 0010 0000)
+        _AMPM = _AMPM >> 5 # move b00100000 to b00000001
+        #if _12hr:
+        #    print("time: {:s}".format("PM" if _AMPM else "AM"))
+        
         # extract weekday:
         wd  = t[MCP7940.PWRMTH] & 0xE0  # (0xE0 = b1110 0000)
         wd = wd >> 5  # move b11100000 to b00000111
@@ -927,9 +937,16 @@ class MCP7940:
             print(TAG+f"t: {t}")
         # Reorder
         t2 = (mth, t[MCP7940.PWRDATE], t[MCP7940.PWRHOUR], t[MCP7940.PWRMIN], wd)
-        
+       
+        if _12hr:
+            t3 = "PM" if _AMPM else "AM"
+            t2 += (t3,) 
+        else:
+            t3 = ""
+            
         if my_debug:
-            print(TAG+f"result: {t2}")
+            print(TAG+f"result: {t2} {t3}")
+
         return t2
     
     def clr_SRAM(self):
