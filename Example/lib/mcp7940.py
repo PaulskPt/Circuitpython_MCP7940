@@ -7,9 +7,23 @@
 # - weekday_N()
 # - weekday_S()
 # - yearday()
+# - _clr_SQWEN_bit()
+# - _read_SQWEN_bit()
+# - _set_ALMPOL_bit()
+# - _clr_ALMPOL_bit()
+# - _read_ALMPOL_bit()
+# - _read_ALMxIF_bit()
+# - _clr_ALMxIF_bit()
+# - _read_ALMxMSK_bits()
+# - _set_ALMxMSK_bits()
+# - pwr_updn_dt()
+# - clr_SRAM()
 # - write_to_SRAM()
 # - read_fm_SRAM()
-# Added dictionaries: DOW and DOM
+# - pr_regs()
+#
+# Added dictionaries: DOW, DOM and bits_dict
+# Added self._match_lst 
 # In functions start() and stop() added functionality to wait for the osc_run_bit to change (See the MC=7940  datasheet DS20005010H-page 15, Note 2)
 # For this in function time() (Setter) I added calls to stop() and start() before and after writing a new time to the MC7940 RTC.
 # Be aware when setting an alarm time one loses the state ALMPOL bit, thye ALMxIF bit and the three ALMxMSK bits. 
@@ -24,8 +38,6 @@ from board import SCL, SDA
 from busio import I2C
 import time
 my_debug = False
-
-
 
 class MCP7940:
     """
