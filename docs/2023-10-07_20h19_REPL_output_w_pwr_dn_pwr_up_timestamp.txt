@@ -33,10 +33,10 @@ setup():                start setting up MCP7940
 setup():                finished setting up MCP7940
 
 main():                 loop nr: 1
-main():                 connected to "Vodafone-8D96F1"!
-main():                 IP address is 192.168.1.98
+main():                 connected to "xxxxx"!
+main():                 IP address is 192.168.x.xxx
 hostname():             wifi.radio.hostname= 'UMFeatherS3'
-mac():                  wifi.radio.mac_address= 70:4:1d:ad:c3:fc
+mac():                  wifi.radio.mac_address= xx:x:xx:xx:xx:xx
 ping_test():            Resolved google address: '216.58.215.174'
 ping_test():            Ping google.com [216.58.215.174]: 22 ms
 
