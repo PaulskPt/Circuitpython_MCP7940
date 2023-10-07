@@ -10,6 +10,11 @@
 # - write_to_SRAM()
 # - read_fm_SRAM()
 # Added dictionaries: DOW and DOM
+# In functions start() and stop() added functionality to wait for the osc_run_bit to change (See the MC=7940  datasheet DS20005010H-page 15, Note 2)
+# For this in function time() (Setter) I added calls to stop() and start() before and after writing a new time to the MC7940 RTC.
+# Be aware when setting an alarm time one loses the state ALMPOL bit, thye ALMxIF bit and the three ALMxMSK bits. 
+# Thus when setting an alarm make sure to set ALMPOL, ALMx1F and ALMxMSK for alarm1 and/or alarm2 in your code.py script. 
+# See the example in function set_alarm() in my code.py example.
 # For the sake of readability: replaced index values like [0] ...[6] with [RTCSEC] ... [RTCYEAR]
 #
 from micropython import const

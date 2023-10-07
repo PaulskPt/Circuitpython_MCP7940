@@ -29,7 +29,21 @@
     to and from the MCP7940 user space in its SRAM.
     The MCP7940 RTC needs only to be set when the RTC has been without power or not has been set before.
     When you need more (debug) output to the REPL, set the global variable 'my_debug' to True.
-
+    
+    Note that NTP weekday starts with 0. Also time.localtime element tm_wday ranges 0-6 while MCP7940 weekday range is 1-7.
+    For this reason we use a mRTC_DOW dictionary in the State Class in this file and
+    Then in three places corrections are performed:
+    a DOW dictionary in the MCP7940 Class in the file lib/mcp7940.py.
+    a) In function set_EXT_RTC() we do the following:
+        dt = time.localtime()
+        state.dt_dict[state.wd] = dt.tm_wday + 1 
+    b) In function set_alarm() we do the following:
+        t1 = time.time()  # get seconds since epoch
+        dt = time.localtime(t1+(mins_fm_now*60)) # convert mins_fm_now to seconds    
+        weekday = dt.tm_wday + 1    
+    c) In function upd_SRAM(), after reading the datetime stamp from SRAM we add a correction:
+        weekday += 1
+    
     Want to see more of my work: Github @PaulskPt
 
 """
@@ -332,7 +346,7 @@ def set_EXT_RTC(state):
     state.dt_dict[state.hh] = dt.tm_hour
     state.dt_dict[state.mm] = dt.tm_min
     state.dt_dict[state.ss] = dt.tm_sec
-    state.dt_dict[state.wd] = dt.tm_wday+1  # NTP weekday 0-6 while NTP7940 weekday 1-7
+    state.dt_dict[state.wd] = dt.tm_wday + 1  # NTP weekday 0-6 while NTP7940 weekday 1-7
     state.dt_dict[state.yd] = mcp.yearday(dt)
     state.dt_dict[state.isdst] = -1
 
@@ -715,7 +729,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
     hours = dt.tm_hour
     minutes = dt.tm_min
     seconds = dt.tm_sec
-    weekday = dt.tm_wday+1
+    weekday = dt.tm_wday + 1
     dow = mcp.DOW[weekday]
     # print(TAG+f"weekday: {weekday}")
 
@@ -724,7 +738,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
     if alarm1en and alarm_nr == 1:
         if my_debug:
             print(TAG+f"setting alarm1 for: {t[:5]}, {dow}")
-        mcp.alarm1 = t
+        mcp.alarm1 = t  # Set alarm1
         t_ck = mcp.alarm1[:6]  # check result
         if my_debug:
             print(TAG+f"check: alarm1 is set for: {t_ck}")
@@ -742,7 +756,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
     if alarm2en and alarm_nr == 2:
         if my_debug:
             print(TAG+f"setting alarm2 for: {t[:5]}, {dow}")
-        mcp.alarm2 = t
+        mcp.alarm2 = t  # Set alarm2
         t_ck = mcp.alarm2[:6]  # check result
         if my_debug:
             print(TAG+f"check: alarm2 is set for: {t_ck}")
@@ -894,7 +908,8 @@ def show_alarm1_output_truth_table(state):
     s1 = "+--------+---------+-------+-----------------------------+"
     s2 = "| ALMPOL  | ALM1IF |  MFP  |         Match type          |"
     alarm1_pol = mcp._read_ALMPOL_bit(1) # Read alarm1 ALMPOL bit
-    print(f"show_alarm1_output_truth_table(): alarm1_pol: {alarm1_pol}")
+    if my_debug:
+        print(f"show_alarm1_output_truth_table(): alarm1_pol: {alarm1_pol}")
     alarm1_IF = mcp._read_ALMxIF_bit(1) # Read alarm1 interrupt flag
     mfp = rtc_mfp_int.value
     msk1 = mcp._read_ALMxMSK_bits(1)
@@ -941,12 +956,13 @@ def show_alm_int_status(state):
         if match2 == "mm":
             ss2 = None
     #tm_current = time.localtime()
-    tm_current = mcp.time
+    tm_current = mcp.time # Get current datetime stamp from the External UM MCP7940 RTC shield
     if my_debug:
         print(f"show_alm_int_status(): mcp.time: {tm_current}")
 
     #print(f"time.localtime(): {tm_current}")
-    c_yr, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, c_yd, c_isdst = tm_current
+    #c_yr, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, c_yd, c_isdst = tm_current
+    _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _ = tm_current  # Discard year, yearday and isdst
     v = "Yes " if rtc_mfp_int.value else "No  "
 
     s3 = "|      {:s}      |    {:s}     |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:s}                   | {:18s} |". \
