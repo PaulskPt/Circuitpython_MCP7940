@@ -45,6 +45,7 @@ import neopixel
 import feathers3
 import rtc
 import mcp7940
+import digitalio
 # Global flags
 # --- DISPLAY DRTIVER selection flag ----+
 use_sh1107 = True    #                   |
@@ -54,6 +55,7 @@ use_TAG = True
 my_debug = False  # Set to True if you need debug output to REPL
 use_ping = True
 
+time.sleep(5) # wait for mu-editor can show REPL from start
 
 mRTC = rtc.RTC()  # create internal RTC object
 if my_debug:
@@ -61,7 +63,7 @@ if my_debug:
 
 import adafruit_ntp
 pool = socketpool.SocketPool(wifi.radio)
-ntp = adafruit_ntp.NTP(pool, tz_offset=1)  
+ntp = adafruit_ntp.NTP(pool, tz_offset=1)
 
 pool = None
 
@@ -71,6 +73,7 @@ class State:
     def __init__(self, saved_state_json=None):
         self.board_id = None
         self.lStart = True
+        self.loop_nr = -1
         self.tag_le_max = 24  # see tag_adj()
         self.use_clr_SRAM = False
         self.set_SYS_RTC = True
@@ -92,6 +95,7 @@ class State:
         self.BLK = None
         self.RED = None
         self.GRN = None
+        self.curr_color_set = self.BLK
         self.yy = 0
         self.mo = 1
         self.dd = 2
@@ -101,7 +105,7 @@ class State:
         self.wd = 6
         self.yd = 7
         self.isdst = 8
-        self.dt_dict = { 
+        self.dt_dict = {
             self.yy: 2023,
             self.mo: 10,
             self.dd: 4,
@@ -111,11 +115,36 @@ class State:
             self.wd: 2,
             self.yd: 277,
             self.isdst: -1}
+        self.alarm1 = ()
+        self.alarm2 = ()
+        self.alarm1_int = False
+        self.alarm2_int = False
+        self.alarm1_set = False
+        self.alarm2_set = False
+        self.mfp = False
+        self.mRTC_DOW = DOW =  \
+        { 
+            0: "Monday",
+            1: "Tuesday",
+            2: "Wednesday",
+            3: "Thursday",
+            4: "Friday",
+            5: "Saturday",
+            6: "Sunday"
+        }
 
 
 state = State()
 
 state.board_id = board.board_id
+
+# Set the interrupt line coming from the UM RTC Shield, pin 4 (MFP)
+# According to the RTC Shield schematic the MFP pin is pulled up
+# through a 10kOhm resistor, connected to VCC (3.3V).
+rtc_mfp_int = digitalio.DigitalInOut(board.IO33)
+rtc_mfp_int.direction = digitalio.Direction.INPUT
+# rtc_mfp_int.pull = digitalio.Pull.UP
+
 
 def pr_msg(state, msg_lst=None):
     pass
@@ -196,10 +225,10 @@ if use_sh1107:
     display_offset=DISPLAY_OFFSET_ADAFRUIT_128x128_OLED_5297,
     rotation=ROTATION,
     )
-    
+
     # Cleanup
     WIDTH = None
-    HEIGHT = None 
+    HEIGHT = None
     ROTATION = None
     BORDER = None
 
@@ -239,31 +268,42 @@ def set_INT_RTC(state):
     global mRTC
     if not state.set_SYS_RTC:
         return
-    
+
     TAG = tag_adj(state, "set_INT_RTC(): ")
     s1 = "Internal (SYS) RTC is set from "
     s2 = "datetime stamp: "
     dt = None
-
-    if is_INT_RTC():
-        mRTC.datetime = ntp.datetime
+    internal_RTC = True if is_INT_RTC() else False
+    if internal_RTC:
+        try:
+            dt = ntp.datetime
+            mRTC.datetime = dt
+        except OSError as e:
+            print(TAG+f"Error while trying to set internal RTC from NTP datetime: {e}")
+            raise
+        except Exception as e:
+            raise
         state.SYS_dt = mRTC.datetime
+        if my_debug:
+            print(TAG+f"mRTC.datetime: {mRTC.datetime}")
         #print(TAG+f"state.SYS_dt: {state.SYS_dt}")
         state.SYS_RTC_is_set = True
         if state.SYS_dt.tm_year >= 2000:
-             print(TAG+s1+"NTP service "+s2) # +f"{state.SYS_dt}")
+             print(TAG+s1+"NTP service "+s2)
+             
     elif state.EXT_RTC_is_set:
         mRTC = mcp.time
         state.SYS_RTC_is_set = True
         state.SYS_dt = mRTC.datetime
         if state.SYS_dt is not None:
             if state.SYS_dt.tm_year >= 2000:
-                print(TAG+s1+"External RTC"+s2) # +f"{state.SYS_dt}")
+                print(TAG+s1+"External RTC"+s2)
     dt = state.SYS_dt
     if not my_debug:
         print(TAG+"{:d}/{:02d}/{:02d}".format(dt.tm_mon, dt.tm_mday, dt.tm_year))
-        print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}".format(dt.tm_hour, dt.tm_min, dt.tm_sec, dt.tm_wday) )
-
+        print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:s}".format(dt.tm_hour, dt.tm_min, dt.tm_sec, state.mRTC_DOW[dt.tm_wday]) )
+        if internal_RTC:
+            print(TAG+"Note that NTP weekday starts with 0 while MCP7940 weekday starts with 1")
 
 def set_EXT_RTC(state):
     global mcp, dt_dict
@@ -272,14 +312,14 @@ def set_EXT_RTC(state):
     s1 = "We\'re going to use "
     s2 = "NTP " if is_NTP else "INT RTC "
     s3 = "to set the EXT RTC"
-    
+
     """ called by setup(). Call only when MCP7940 datetime is not correct """
-    
+
     if not state.set_EXT_RTC:
         return
 
     # We're going to set the external RTC from NTP
-    print(TAG+s1+s2+s3)  
+    print(TAG+s1+s2+s3)
 
     if is_NTP:
         dt = ntp.datetime
@@ -292,22 +332,22 @@ def set_EXT_RTC(state):
     state.dt_dict[state.hh] = dt.tm_hour
     state.dt_dict[state.mm] = dt.tm_min
     state.dt_dict[state.ss] = dt.tm_sec
-    state.dt_dict[state.wd] = dt.tm_wday
+    state.dt_dict[state.wd] = dt.tm_wday+1  # NTP weekday 0-6 while NTP7940 weekday 1-7
     state.dt_dict[state.yd] = mcp.yearday(dt)
     state.dt_dict[state.isdst] = -1
-    
+
     if not my_debug:
         print(TAG + s2 + f"datetime stamp:")
         print(TAG+"{:d}/{:02d}/{:02d}".format(
             state.dt_dict[state.mo], state.dt_dict[state.dd], state.dt_dict[state.yy]))
-        print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:d}, yearday: {:d}, isdst: {:d}".format(
-            state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], 
-            state.dt_dict[state.wd], state.dt_dict[state.yd], state.dt_dict[state.isdst]) )
+        print(TAG+"{:02d}:{:02d}:{:02d} weekday: {:s}, yearday: {:d}, isdst: {:d}".format(
+            state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss],
+            mcp.DOW[ state.dt_dict[state.wd]], state.dt_dict[state.yd], state.dt_dict[state.isdst]) )
 
-    dt2 = (state.dt_dict[state.yy], state.dt_dict[state.mo], state.dt_dict[state.dd], 
-          state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss], 
+    dt2 = (state.dt_dict[state.yy], state.dt_dict[state.mo], state.dt_dict[state.dd],
+          state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss],
           state.dt_dict[state.wd])
-    
+
     if my_debug:
         print(TAG+f"going to set "+eRTC+" for: {dt2}")
     mcp.time = dt2 # Set the external RTC
@@ -319,6 +359,8 @@ def set_EXT_RTC(state):
             print(TAG+eRTC+f"updated to: {ck_dt}")
     else:
         state.SRAM_dt = ()
+    if not my_debug:
+        print()
 
 # Convert a list to a tuple
 def convert(lst):
@@ -373,24 +415,26 @@ def upd_SRAM(state):
 
         year, month, date, hours, minutes, seconds, weekday, yearday, isdst = res2
 
+        weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
+        
         dt1 = "{}/{:02d}/{:02d}".format(
             year,
             month,
             date)
 
-
         dt2 = "{:02d}:{:02d}:{:02d}".format(
             hours,
             minutes,
             seconds)
-
+        
         wd = mcp.DOW[weekday]
+        # print(TAG+f"weekday: {weekday}, mcp.DOW[weekday]: {wd}")
+
         dt3 = "wkday: {}".format(wd)
 
         dt4 = "yrday: {}".format(yearday)
 
         dt5 = "dst: {}".format(isdst)
-
 
         msg = ["Read from SRAM:", dt1, dt2, dt3, dt4, dt5]
         pr_msg(state, msg)
@@ -478,7 +522,7 @@ def wifi_is_connected(state):
         my_ip = state.ip
     else:
         my_ip = wifi.radio.ipv4_address
-        
+
     if my_ip is None:
         return False
     else:
@@ -503,7 +547,7 @@ def setup(state):
     TAG = tag_adj(state, "setup(): ")
     # Create a colour wheel index int
     color_index = 0
-    
+
     print(TAG+f"board: \'{state.board_id}\'")
 
     if state.board_id == 'unexpectedmaker_feathers3':
@@ -525,16 +569,20 @@ def setup(state):
     wifi.AuthMode.WPA2   # set only once
 
     if is_NTP(state):
-        print(TAG+"We have NTP")
+        if not my_debug:
+            print(TAG+"We have NTP")
     if is_INT_RTC():
-        print(TAG+"We have an internal RTC")
+        if not my_debug:
+            print(TAG+"We have an internal RTC")
         if state.SYS_RTC_is_set:
-            print(TAG+"and the internal RTC is set from an NTP server")
+            if my_debug:
+                print(TAG+"and the internal RTC is set from an NTP server")
     if is_EXT_RTC:
-        print(TAG+"We have an external RTC")
+        if not my_debug:
+            print(TAG+"We have an external RTC")
         if state.EXT_RTC_is_set:
-            print(TAG+"and the external RTC is set from an NTP server")
-
+            if my_debug:
+                print(TAG+"and the external RTC is set from an NTP server")
 
     s_mcp = "MCP7940"
     s_pf1 = s_mcp+" Power failed"
@@ -560,11 +608,11 @@ def setup(state):
     if my_debug:
         print(TAG+f"Checking if {s_mcp} has been started.")
     if not mcp.is_started():
-        if my_debug:
+        if not my_debug:
             print(TAG+f"{s_mcp} not started yet...")
         mcp.start()
         if mcp.is_started():
-            if my_debug:
+            if not my_debug:
                 print(TAG+f"{s_mcp} now started")
         else:
             print(TAG+f"failed to start {s_mcp}")
@@ -585,7 +633,7 @@ def setup(state):
     else:
         if my_debug:
             print(TAG+f"{s_en2}{s_bbe_yn}")
-            
+
     if state.set_SYS_RTC :
         if my_debug:
             print(TAG+"Going to set internal (SYS) RTC")
@@ -594,9 +642,12 @@ def setup(state):
     if state.set_EXT_RTC:
         set_EXT_RTC(state)
 
+    if not my_debug:
+        print()
+
     state.SRAM_dt = convert( mcp.read_fm_SRAM() )
     # print(TAG+f"SRAM_dt: {SRAM_dt}. type(SRAM_dt): {type(SRAM_dt)}. len(SRAM_dt): {len(SRAM_dt)}")
-    
+
     if my_debug:
         if isinstance(state.SRAM_dt, tuple):
             le = len(state.SRAM_dt)
@@ -610,6 +661,363 @@ def setup(state):
         else:
             print(TAG+f"Expected type tuple but got type: {type(state.SRAM_dt)}")
 
+    if not my_debug:
+        print(TAG+"start setting up MCP7940")
+        
+    mcp._clr_SQWEN_bit()  # Clear the Square Wave Enable bit
+    mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
+    mcp._clr_ALMxIF_bit(1)     # Clear the interrupt of alarm1
+    mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
+    state.alarm1_int = False
+    mcp.alarm_enable(1, True)     # Enable alarm1
+    
+    mcp._set_ALMPOL_bit(2) # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
+    mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm2
+    mcp._set_ALMxMSK_bits(2,1) # Set the alarm3 mask bits for a minutes match
+    state.alarm2_int = False
+    mcp.alarm_enable(2, False)     # Disable alarm2
+    
+    state.mfp = rtc_mfp_int.value
+    
+    if not my_debug:
+        print(TAG+"finished setting up MCP7940")
+    # prepare_alm_int(state)  # Prepare for alarm interrupt polling
+
+# Make preparations to enable alarm interrups from RTC shield
+# through the MFP (IO4) of the RTC shield.
+def prepare_alm_int(state):
+
+    # See the MCP7940N datasheet, paragraph 5.5, DS20005010H-page 25
+    # See the Dual Alarm Output Truth Table (Table 5-10) on page 27
+    mcp._clr_SQWEN_bit()  # Clear the Square Wave Enable bit
+    for _ in range(2):
+        if not mcp.alarm_is_enabled(_+1):
+            mcp.alarm_enable(_+1, True)  # Enable the alarm (1 or 2)
+
+
+def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
+    TAG = tag_adj(state, "set_alarm(): ")
+
+    if not alarm_nr in [1, 2]:
+        return
+
+    if mins_fm_now > 60:  # not more dan 60 minutes from now
+        mins_fm_now = 10
+
+    alarm1en = mcp.alarm_is_enabled(1)
+    alarm2en = mcp.alarm_is_enabled(2)
+
+    t1 = time.time()  # get seconds since epoch
+    dt = time.localtime(t1+(mins_fm_now*60)) # convert mins_fm_now to seconds
+
+    month = dt.tm_mon
+    date = dt.tm_mday
+    hours = dt.tm_hour
+    minutes = dt.tm_min
+    seconds = dt.tm_sec
+    weekday = dt.tm_wday+1
+    dow = mcp.DOW[weekday]
+    # print(TAG+f"weekday: {weekday}")
+
+    t = month, date, hours, minutes, seconds, weekday
+        
+    if alarm1en and alarm_nr == 1:
+        if my_debug:
+            print(TAG+f"setting alarm1 for: {t[:5]}, {dow}")
+        mcp.alarm1 = t
+        t_ck = mcp.alarm1[:6]  # check result
+        if my_debug:
+            print(TAG+f"check: alarm1 is set for: {t_ck}")
+        state.alarm1 = t_ck
+        state.alarm1_set = True
+        # IMPORTANT NOTE: 
+        # ===============
+        # I experienced that if mcp.alarm1 (or mcp.alarm2) is called earlier setting of the ALMPOL bit is reset,
+        # that is why we set the ALMPOL bit again (below)
+        # ===============
+        mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
+        mcp._clr_ALMxIF_bit(1)     # Clear the interrupt of alarm1
+        mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
+
+    if alarm2en and alarm_nr == 2:
+        if my_debug:
+            print(TAG+f"setting alarm2 for: {t[:5]}, {dow}")
+        mcp.alarm2 = t
+        t_ck = mcp.alarm2[:6]  # check result
+        if my_debug:
+            print(TAG+f"check: alarm2 is set for: {t_ck}")
+        state.alarm2 = t_ck
+        state.alarm2_set = True
+        mcp._set_ALMPOL_bit(2) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
+        mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm1
+        mcp._set_ALMxMSK_bits(2,1) # Set the alarm1 mask bits for a minutes match
+
+def clr_alarm(state, alarm_nr=None):
+    TAG = tag_adj(state, "clr_alarm(): ")
+    if alarm_nr is None:
+        return
+
+    eal = (0,)*6
+
+    if alarm_nr in [1, 2]:
+        if alarm_nr == 1:
+            mcp.alarm1 = eal  # clear alarm1 datetime stamp
+            mcp._clr_ALMxIF_bit(1) # clear alarm1 Interrupt Flag bit
+            state.alarm1_set = False
+            state.alarm1 = eal
+            if my_debug:
+                print(TAG+f"state.alarm1: {state.alarm1[:6]}")
+            ck = mcp.alarm1[:6]
+        elif alarm_nr == 2:
+            mcp.alarm2 = eal    # clear alarm2 datetime stamp
+            mcp._clr_ALMxIF_bit(2) # clear alarm2 Interrupt Flag bit
+            state.alarm2_set = False
+            state.alarm2 = eal
+            if my_debug:
+                print(TAG+f"state.alarm2: {state.alarm2[:6]}")
+            ck = mcp.alarm2[:6]
+        if my_debug:
+            print(TAG+f"alarm{alarm_nr}, check: {ck}")
+
+def pol_alarm_int(state):
+    TAG = tag_adj(state, "pol_alarm_int(): ")
+    t_ck = None
+    alarm1en = False
+    alarm2en = False
+    alm1msk_bits = None
+    alm2msk_bits = None
+
+    for _ in range(2):
+        if _ == 0:
+            alarm1en = True if mcp.alarm_is_enabled(1) else False
+        if _ == 1:
+            alarm2en = True if mcp.alarm_is_enabled(2) else False
+
+    if alarm1en:
+        if my_debug:
+            print(TAG+"alarm1 is enabled")
+        #t_ck = mcp.alarm1[:6]  # check result
+        t_ck = state.alarm1[:6]
+        if my_debug:
+            print(TAG+f"alarm1 is set for: {t_ck}")
+        state.alarm1_int = True if mcp._read_ALMxIF_bit(1) else False
+        if state.alarm1_int:
+            alm1if_bit = mcp._read_ALMxIF_bit(1)
+            if my_debug:
+                print(TAG+"we have an interrupt from alarm1")
+                print(TAG+"alarm1 IF bit: {:b}".format(alm1if_bit))
+                alm1msk_bits = mcp._read_ALMxMSK_bits(1)
+                show_alm_match_type(alm1msk_bits)
+            ck_rtc_mfp_int(state)
+
+    if alarm2en:
+        if my_debug:
+            print(TAG+"alarm2 is enabled")
+        #t_ck = mcp.alarm2[:6]  # check result
+        t_ck = state.alarm2[:6]
+        if my_debug:
+            print(TAG+f"alarm2 is set for: {t_ck}")
+        state.alarm2_int = True if mcp._read_ALMxIF_bit(2) else False
+        if state.alarm2_int:
+            alm2if_bit = mcp._read_ALMxIF_bit(2)
+            if my_debug:
+                print(TAG+"we have an interrupt from alarm2")
+                print(TAG+"alarm2 IF bit: {:b}".format(alm2if_bit))
+                alm2msk_bits = mcp._read_ALMxMSK_bits(2)
+                show_alm_match_type(alm2msk_bits)
+            ck_rtc_mfp_int(state)
+
+# check the RTC interrupt line (RTC io4 to FeatherS3 io33)
+def ck_rtc_mfp_int(state):
+    TAG = tag_adj(state, "ck_rtc_mfp_int(): ")
+    v = rtc_mfp_int.value
+    s = "High" if v else "Low "
+    if my_debug:
+        print(TAG+f"rtc interrupt line value: {s}")
+    if v:
+        state.mfp = v
+        #print(TAG+"RING RING RING we have an RTC interrupt !")
+        #alarm_blink(state)
+
+# Called from function: pol_alarm_int(state)
+def show_alm_match_type(msk=None):
+    TAG = tag_adj(state, "show_alm_match_type(): ")
+    if msk is None:
+        return
+    if msk >= 0 and msk <= 7:
+        print(TAG+f"match type: {mcp._match_lst[msk]}")
+
+
+def show_mfp_output_mode_status(stete):
+    if state.loop_nr < 3:
+        return
+    print()
+    print("MCP7940 MFP output mode:")
+    s1 = "+--------+--------+--------+--------------------------+"
+    s2 = "| SQWEN  | ALM0EN | ALM1EN |          Mode            |"
+    aio = "Alarm Interruput output "
+    sqwen =  mcp._read_SQWEN_bit()
+    alm1en = mcp.alarm_is_enabled(1)
+    alm2en = mcp.alarm_is_enabled(2)
+
+    if not sqwen:
+        if not alm1en:
+            if not alm2en:  # 0 0 0
+                mode = "Gen purpose output      "
+            elif alm2en:    # 0 0 1
+                mode = aio
+        elif alm1en:
+            if not alm2en:  # 0 1 0
+                mode = aio
+            elif alm2en:    # 0 1 1
+                mode = aio
+    elif sqwen:             # 1 x x
+        mode = "Square Wave Clock Output"
+    else:
+        mode = "Unknwon                 "
+
+    s3= "|   {:d}    |   {:d}    |   {:d}    | {:s} |".format(sqwen, alm1en, alm2en, mode)
+    print(s1)
+    print(s2)
+    print(s1)
+    print(s3)
+    print(s1)
+    print("See: MCP7940N datasheet DS20005010H-page 25")
+    print()
+
+
+def show_alarm1_output_truth_table(state):
+    if state.loop_nr < 3:
+        return
+    print()
+    print("Single Alarm output truth table:")
+    s1 = "+--------+---------+-------+-----------------------------+"
+    s2 = "| ALMPOL  | ALM1IF |  MFP  |         Match type          |"
+    alarm1_pol = mcp._read_ALMPOL_bit(1) # Read alarm1 ALMPOL bit
+    print(f"show_alarm1_output_truth_table(): alarm1_pol: {alarm1_pol}")
+    alarm1_IF = mcp._read_ALMxIF_bit(1) # Read alarm1 interrupt flag
+    mfp = rtc_mfp_int.value
+    msk1 = mcp._read_ALMxMSK_bits(1)
+    msk1_match = mcp._match_lst[msk1]
+    notes1 = "mask bits: \'b{:03b}\' type: {:3s}".format(msk1, msk1_match)
+    s3= "|   {:d}    |   {:d}     |   {:d}   | {:24s} |".format(alarm1_pol, alarm1_IF, mfp, notes1)
+    print(s1)
+    print(s2)
+    print(s1)
+    print(s3)
+    print(s1)
+    print("See: MCP7940N datasheet DS20005010H-page 27")
+    print()
+
+
+def show_alm_int_status(state):
+    if state.loop_nr < 3:
+        return
+    match1 = ""
+    match2 = ""
+    s1 = "+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+"
+    s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | SECOND | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |"
+    ae1=mcp.alarm_is_enabled(1)
+    ae2=mcp.alarm_is_enabled(2)
+
+    if ae1:
+        alarm1en = "Yes" if ae1 else "No  "
+        #ts1 = mcp.alarm1[:6]  # slice off yearday and isdst
+        ts1 = state.alarm1[:6]
+        if my_debug:
+            print(f"alarm1 set for: {ts1}")
+        mo1, dd1, hh1, mi1, ss1, wd1 = ts1
+        match1 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
+        if match1 == "mm":
+            ss1 = None
+    if ae2:
+        alarm2en = "Yes" if ae2 else "No  "
+        # ts2 = mcp.alarm2[:6]  # slice off yearday and isdst
+        ts2 = state.alarm2[:6]
+        if my_debug:
+            print(f"alarm2 set for: {ts2}")
+        mo2, dd2, hh2, mi2, ss2, wd2 = ts2
+        match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
+        if match2 == "mm":
+            ss2 = None
+    #tm_current = time.localtime()
+    tm_current = mcp.time
+    if my_debug:
+        print(f"show_alm_int_status(): mcp.time: {tm_current}")
+
+    #print(f"time.localtime(): {tm_current}")
+    c_yr, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, c_yd, c_isdst = tm_current
+    v = "Yes " if rtc_mfp_int.value else "No  "
+
+    s3 = "|      {:s}      |    {:s}     |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:s}                   | {:18s} |". \
+        format("X","X", c_mo, c_dd, c_hh, c_mi, c_ss,mcp.DOW[c_wd][:3],"X","CURRENT DATETIME")
+
+    if ae1:
+        if ss1 is None: # We don't display seconds if we do an alarm match on minutes
+            s4 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:3s}                | {:18s} |". \
+            format(1, alarm1en, mo1, dd1, hh1, mi1, " X", mcp.DOW[wd1][:3], v, "ALARM1 SET FOR")
+        else:
+            s4 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:3s}                | {:18s} |". \
+            format(1, alarm1en, mo1, dd1, hh1, mi1, ss1, mcp.DOW[wd1][:3], v, "ALARM1 SET FOR")
+
+    if ae2:
+        if ss2 is None: # We don't display seconds if we do an alarm match on minutes
+            s5 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:3s}                | {:18s} |". \
+            format(2, alarm2en, mo2, dd2, hh2, mi2, " X", mcp.DOW[wd2][:3], v, "ALARM2 SET FOR")
+        else:
+            s5 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:3s}                | {:18s} |". \
+            format(2, alarm2en, mo2, dd2, hh2, mi2, ss2, mcp.DOW[wd2][:3], v, "ALARM2 SET FOR")
+
+    nxt_int = mi1 if ae1 else mi2 if ae2 else -1 # Next interrupt expected at minute:
+    print()
+    print("Alarm interrupt status:")
+    if match1 == "mm" or match2 == "mm" and nxt_int != -1:
+        print(f"Expect next alarm at minute: {nxt_int}")
+    print(s1)
+    print(s2)
+    print(s1)
+    print(s3)
+    print(s1)
+    if ae1:
+        print(s4)  # Print only enabled alarm
+    print(s1)
+    if ae2:
+        print(s5) # idem
+        print(s1)
+
+
+def alarm_blink(state):
+    if state.loop_nr < 3:
+        return
+    TAG = tag_adj(state, "alarm_blink(): ")
+    my_RED = (0,   200,   0)
+    my_GRN = (200,   0,   0)
+    my_BLU = (0,     0, 200)
+    my_BLK = (0,     0,   0)
+
+    current_color = state.curr_color_set
+    if state.use_neopixel:
+        for _ in range(5):
+            if my_debug:
+                print(TAG+f"blinking: RED")
+            r,g,b = my_RED # feathers3.rgb_color_wheel( state.RED )
+            pixels[0] = ( r, g, b, state.neopixel_brightness)
+            pixels.write()
+            time.sleep(1)
+            if my_debug:
+                print(TAG+f"blinking: BLUE")
+            r,g,b = my_BLU #feathers3.rgb_color_wheel( state.BLK )
+            pixels[0] = ( r, g, b, state.neopixel_brightness)
+            pixels.write()
+            time.sleep(1)
+        # restore last color:
+        if my_debug:
+            print(TAG+f"resetting color to: {current_color}")
+        r,g,b = feathers3.rgb_color_wheel( current_color )
+        pixels[0] = ( r, g, b, state.neopixel_brightness)
+        pixels.write()
+
+
 def get_dt(state):
     dt = None
     ret = ""
@@ -622,8 +1030,9 @@ def get_dt(state):
         else:
             dt = mcp.time
         yrday = mcp.yearday(dt)
-        ret = "{} {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}. Day of year: {:>3d}".format(mcp.weekday_S(),dt[state.yy], dt[state.mo], dt[state.dd], dt[state.hh], dt[state.mm], dt[state.ss], yrday)
-    
+        ret = "{} {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}. Day of year: {:>3d}". \
+            format(mcp.weekday_S(),dt[state.yy], dt[state.mo], dt[state.dd], dt[state.hh], dt[state.mm], dt[state.ss], yrday)
+
     return ret
 
 
@@ -683,11 +1092,11 @@ def ping_test(state):
 """
 def do_connect(state):
     TAG = tag_adj(state, "do_connect(): ")
-    
+
     # Get env variables from file settings.toml
     ssid = os.getenv("CIRCUITPY_WIFI_SSID")
     pw = os.getenv("CIRCUITPY_WIFI_PASSWORD")
-    
+
     try:
         wifi.radio.connect(ssid=ssid, password=pw)
     except ConnectionError as e:
@@ -836,27 +1245,30 @@ def main():
     discon_msg_shown = False
 
     ping_done = False
-    grn_set = False
-    red_set = False
+    state.grn_set = False
+    state.red_set = False
     count_tried = 0
     count_tried_max = 10
     state.lStart = True
-    loop_nr = 0
+    state.loop_nr = 0
+    state.alarm1_set = False
+    alarm_start = True
     while True:
         try:
-            loop_nr += 1
-            if loop_nr >= 100:
-                loop_nr = 1
-            if my_debug:
-                print(TAG+f"loop nr: {loop_nr}")
+            state.loop_nr += 1
+            if state.loop_nr >= 100:
+                state.loop_nr = 1
+            if not my_debug:
+                print()
+                print(TAG+f"loop nr: {state.loop_nr}")
             if not wifi_is_connected(state):
                 if not my_debug:
                     print(TAG+"going to establish a WiFi connection...")
                 do_connect(state)
             if wifi_is_connected(state):  # Check again.
                 if state.board_id == 'unexpectedmaker_feathers3':
-                    if state.use_neopixel and not grn_set:
-                        grn_set = True
+                    if state.use_neopixel and not state.curr_color_set == state.GRN:
+                        state.curr_color_set = state.GRN
                         r,g,b = feathers3.rgb_color_wheel( state.GRN )
                         pixels[0] = ( r, g, b, state.neopixel_brightness)
                         pixels.write()
@@ -879,8 +1291,8 @@ def main():
                     discon_msg_shown = True
                     print(TAG+"WiFi disconnected")
                     if state.board_id  == 'unexpectedmaker_feathers3':
-                        if neopixel and not red_set:
-                            red_set = True
+                        if neopixel  and not state.curr_color_set == state.RED:
+                            state.curr_color_set = state.RED
                             r,g,b = feathers3.rgb_color_wheel( state.RED )
                             pixels[0] = ( r, g, b, state.neopixel_brightness)
                             pixels.write()
@@ -897,9 +1309,30 @@ def main():
                 #sys.exit()
                 say_hello(False)  # Was: False
                 upd_SRAM(state)
+                if alarm_start:
+                    clr_alarm(state, 1)
+                    state.alarm1_set = False
+                    mcp._set_ALMxMSK_bits(1, 1)  # Set Alarm1 Mask bits to have Alarm Minutes match
+                    if not state.alarm1_set:
+                        set_alarm(state, 1, 2) # Set alarm1 for time now + 2 minutes
+                        state.alarm1_set = True
+                        alarm_start = False
+                #pol_alarm_int(state)  # Check alarm interrupt
+                ck_rtc_mfp_int(state)
+                show_mfp_output_mode_status(state)
+                show_alarm1_output_truth_table(state)
+                show_alm_int_status(state)
+                pol_alarm_int(state)  # Check alarm interrupt
+                if state.mfp:  # We have an interrupt!
+                    print(TAG+"RING RING RING we have an RTC interrupt !")
+                    alarm_blink(state)
+                    mcp._clr_ALMxIF_bit(1) # Clear the interrupt
+                    state.mfp = False
+                    raise KeyboardInterrupt
         except KeyboardInterrupt:
             wifi.radio.stop_station()
             r,g,b = feathers3.rgb_color_wheel( state.BLK )
+            state.curr_color_set == state.BLK
             pixels[0] = ( r, g, b, state.neopixel_brightness)
             pixels.write()
             print("KeyboardInterrupt. Exiting...")

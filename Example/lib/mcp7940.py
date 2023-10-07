@@ -20,12 +20,6 @@ from busio import I2C
 import time
 my_debug = False
 
-CONTROL_REGISTER = 0x00  # control register on the MCP7940
-REGISTER_ALARM0  = 0x0A 
-REGISTER_ALARM1  = 0x11
-REGISTER_PWR_FAIL = 0x18
-
-SRAM_START_ADDRESS = 0x20  # a SRAM space on the MCP7940
 
 
 class MCP7940:
@@ -45,6 +39,14 @@ class MCP7940:
     ADDRESS = const(0x6F)       # '11001111'
     CONTROL_BYTE = 0xde # '1101 1110'
     
+    
+    CONTROL_REGISTER = 0x00  # control register on the MCP7940
+    REGISTER_ALARM0  = 0x0A 
+    REGISTER_ALARM1  = 0x11
+    REGISTER_PWR_FAIL = 0x18
+
+    SRAM_START_ADDRESS = 0x20  # a SRAM space on the MCP7940
+    
     # MCP7940 registers
     RTCSEC = 0x00 # RTC seconds register
     RTCMIN = 0x01
@@ -60,6 +62,12 @@ class MCP7940:
     PWRDATE = 0x02 # reg 0x1E
     PWRMTH = 0x03 # reg 0x1F
     FAIL_BIT = 4
+    OSCRUN_BIT = 5
+    ALARM0EN_BIT = 4 
+    ALARM1EN_BIT = 5
+    SQWEN_BIT = 6
+    ALMPOL_BIT = 7
+    ALMxIF_BIT = 3
     ST = 7  # Status bit
     VBATEN = 3  # External battery backup supply enable bit
     
@@ -73,23 +81,31 @@ class MCP7940:
     TIME_AND_DATE_END = 0X06
     CONFIG_START = 0X07
     CONFIG_END = 0X09
-    ALARM0_START = 0X0A
-    ALARM0_END = 0X10
-    ALARM1_START = 0X11
-    ALARM1_END = 0X18
+    ALARM1_START = 0X0A
+    ALARM1_END = 0X10
+    ALARM2_START = 0X11
+    ALARM2_END = 0X18
     POWER_FAIL_TIMESTAMP_START = 0X18
     POWER_FAIL_TIMESTAMP_END = 0X1F
     SRAM_START = 0X20  # 64 Bytes
     SRAM_END = 0X5F
     
+    # From MCP7940 Datasheet DS20005010H-page 15
+    """
+    The day of week value counts from 1 to 7, increments
+    at midnight, and the representation is user-defined (i.e.,
+    the MCP7940N does not require 1 to equal Sunday,
+    etc.)
+    """
+
     """ Dictionary added by @Paulskpt. See weekday_S() """
-    DOW = { 0: "Monday",
-            1: "Tuesday",
-            2: "Wednesday",
-            3: "Thursday",
-            4: "Friday",
-            5: "Saturday",
-            6: "Sunday" }
+    DOW = { 1: "Monday",
+            2: "Tuesday",
+            3: "Wednesday",
+            4: "Thursday",
+            5: "Friday",
+            6: "Saturday",
+            7: "Sunday" }
     
     DOM = { 1:31,
             2:28,
@@ -113,6 +129,7 @@ class MCP7940:
         self.dt_sram = bytearray()
         self.year_day = 0
         self.is_dst = 0
+        self._match_lst = ["ss", "mm", "hh", "dow", "dd", "res", "res", "all"]
         
     def has_power_failed(self):
         return True if self._read_bit(MCP7940.PWR_FAIL_REG, MCP7940.FAIL_BIT) else False
@@ -121,10 +138,24 @@ class MCP7940:
         self._set_bit(MCP7940.PWR_FAIL_REG, MCP7940.FAIL_BIT, 0)
     
     def start(self):
+        ads = 0x3
         self._set_bit(MCP7940.RTCSEC, MCP7940.ST, 1)
+        while True:
+            osc_run_bit = self._read_bit(ads, MCP7940.OSCRUN_BIT)
+            if my_debug:
+                print(f"MCP7940.start(): osc_run_bit: {osc_run_bit}")
+            if osc_run_bit:
+                break
 
     def stop(self):
+        ads = 0x3
         self._set_bit(MCP7940.RTCSEC, MCP7940.ST, 0)
+        while True:
+            osc_run_bit = self._read_bit(ads, MCP7940.OSCRUN_BIT)
+            if my_debug:
+                print(f"MCP7940.stop(): osc_run_bit: {osc_run_bit}")
+            if not osc_run_bit:
+                break
 
     def is_started(self):
         return self._read_bit(MCP7940.RTCSEC, MCP7940.ST)
@@ -236,7 +267,8 @@ class MCP7940:
             #pass
         
         ret = (register_val[0] & (1 << bit)) >> bit
-        # print(TAG+f"received from RTC (register_val): {register_val}. func return value: {ret}")
+        if my_debug:
+            print(TAG+f"received from RTC register: {hex(register)}, bit nr: {bit}, (register_val): {register_val}. func return value: {ret}")
         return ret
 
     @property
@@ -251,19 +283,20 @@ class MCP7940:
             (2019, 6, 3, 13, 12, 44, 0)
             # 1:12:44pm on Monday (0) the 3 Jun 2019
         """
-        TAG = "MCP7940.time(): "
+        TAG = "MCP7940.time():         "
         if my_debug:
-            print(f"time() setter: param t: {t}")
+            print(TAG+f"setter: param t: {t}")
         year, month, date, hours, minutes, seconds, weekday = t
         # Reorder
-        time_reg = [seconds, minutes, hours, weekday + 1, date, month, year % 100]
+        time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
+        print(TAG+f"time_reg:{time_reg}")
 
         # Add ST (status) bit
 
         # Add VBATEN (battery enable) bit
         if my_debug:
             print(TAG+
-                "{}/{}/{} {}:{}:{} (weekday={})".format(
+                "{}/{}/{} {}:{}:{} (weekday {} = {})".format(
                     time_reg[MCP7940.RTCYEAR],
                     time_reg[MCP7940.RTCMTH],
                     time_reg[MCP7940.RTCDATE],
@@ -271,6 +304,7 @@ class MCP7940:
                     time_reg[MCP7940.RTCMIN],
                     time_reg[MCP7940.RTCSEC],
                     time_reg[MCP7940.RTCWKDAY],
+                    MCP7940.DOW[time_reg[MCP7940.RTCWKDAY]],
                 )
             )
         
@@ -282,64 +316,137 @@ class MCP7940:
             >>> zipped = zip(x,y)
             >>> list(zipped)
             [(1, 4), (2, 5), (3, 6)]"""
-        t = bytearray()
-        t.append(CONTROL_REGISTER)
-        # t.append((self.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter))
+            
+        out_buf = bytearray()
+        out_buf.append(MCP7940.CONTROL_REGISTER)
+        t = [(self.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
+        """
         for reg, filt in zip(time_reg, reg_filter):
             n = self.int_to_bcd(reg) & filt
+            print(TAG+"reg: {:2d}, filt: {:3d}, n: {:2d}".format(reg, filt, n))
             t.append(n)
-        
+            
+        t = [(self.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
+        """
+        for _ in range(len(t)):
+            out_buf.append(t[_])
+
         # Note that some fields will be overwritten that are important!
         # fixme!
+  
         if my_debug:
-            print(TAG+"writing t = ", t)
-            
+            ck_dt = ()
+            for _ in range(len(out_buf)):
+                ck_dt += (self.bcd_to_int(out_buf[_]),)
+            print(TAG+f"writing out_buf: {out_buf}, list(ck_dt): {ck_dt}") # in ck_dt skip the first byte which is the registry address
+        
+        self.stop()  # See:  MCP7940 DATASHEET: DS20005010H-page 15
+
         try:
             while not self._i2c.try_lock():
                 pass
-            self._i2c.writeto(MCP7940.ADDRESS, t)
+            self._i2c.writeto(MCP7940.ADDRESS, out_buf)
     
         except OSError as e:
             print(TAG+f"Error: {e}")
         finally:
             self._i2c.unlock()
-       
+            
+        self.start()
+    
+    def alarm_enable(self, alarm_nr= None, onoff = False):
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if not isinstance(onoff, bool):
+            return
         
+        reg = 0x07 # Control register (Address 0x07)
+        
+        if alarm_nr == 1:
+            bit = 4
+        elif alarm_nr == 2:
+            bit = 5
+        
+        value = 1 if onoff else 0
+        
+        self._set_bit(reg, bit, value)
+
+    def alarm_is_enabled(self, alarm_nr=None):
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        
+        reg = 0x07 # Control register (Address 0x07)   
+        
+        if alarm_nr == 1:
+            bit = 4
+        elif alarm_nr == 2:
+            bit = 5
+        
+        return self._read_bit(reg, bit)
+    
     @property
     def alarm1(self):
-        return self._get_time(start_reg=0x0A)
+        return self._get_time(start_reg=MCP7940.ALARM1_START)
 
     @alarm1.setter
     def alarm1(self, t):
-        _, month, date, hours, minutes, seconds, weekday, _ = t  # Don't need year or yearday
+        TAG = "alarm1(): "
+        if my_debug:
+            print(TAG+f"setting alarm1 to: {t}")
+        le = len(t)
+        if le == 8:
+            _, month, date, hours, minutes, seconds, weekday, _ = t  # Don't need year or yearday
+        elif le == 6:
+            month, date, hours, minutes, seconds, weekday = t
         # Reorder
-        time_reg = [seconds, minutes, hours, weekday + 1, date, month]
+        time_reg = [seconds, minutes, hours, weekday, date, month]
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F)  # No year field for alarms
+        out_buf = bytearray()
+        out_buf.append(MCP7940.ALARM1_START)
         t = [(self.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
+        for _ in range(len(t)):
+            out_buf.append(t[_])
         
         while not self._i2c.try_lock():
             pass
-        
-        self._i2c.writeto(0x0A, bytes(t))
+        if my_debug:
+            print(TAG+f"writing to alarm1: {list(out_buf)}")
+        self._i2c.writeto(MCP7940.ADDRESS, out_buf) 
 
         self._i2c.unlock()
         
     @property
     def alarm2(self):
-        return self._get_time(start_reg=0x11)
+        return self._get_time(start_reg=MCP7940.ALARM2_START)
 
     @alarm2.setter
     def alarm2(self, t):
-        _, month, date, hours, minutes, seconds, weekday, _ = t  # Don't need year or yearday
+        TAG = "alarm2(): "
+        if my_debug:
+            print(TAG+f"setting alarm2 to: {t}")
+        le = len(t)
+        if le == 8:
+            _, month, date, hours, minutes, seconds, weekday, _ = t  # Don't need year or yearday
+        elif le == 6:
+            month, date, hours, minutes, seconds, weekday = t
         # Reorder
-        time_reg = [seconds, minutes, hours, weekday + 1, date, month]
+        time_reg = [seconds, minutes, hours, weekday, date, month]
         reg_filter = (0x7F, 0x7F, 0x3F, 0x07, 0x3F, 0x3F)  # No year field for alarms
+        out_buf = bytearray()
+        out_buf.append(MCP7940.ALARM2_START)
         t = [(self.int_to_bcd(reg) & filt) for reg, filt in zip(time_reg, reg_filter)]
-        
+        for _ in range(len(t)):
+            out_buf.append(t[_])
+            
         while not self._i2c.try_lock():
             pass
-      
-        self._i2c.writeto(0x11, bytes(t))
+        if my_debug:
+            print(TAG+f"writing to alarm2: {list(out_buf)}")
+        self._i2c.writeto(MCP7940.ADDRESS, out_buf) 
         
         self._i2c.unlock()
 
@@ -361,7 +468,7 @@ class MCP7940:
         """ Function added by @Paulskpt """
         dt = self._get_time()
         le = len(dt)
-        return dt[le-1:][0]+1  # dt[le-1:] results in tuple: (0,) so we have to extract the first element.
+        return dt[le-1:][0] # dt[le-1:] results in tuple: (0,) so we have to extract the first element.
     
     def weekday_S(self):
         """ Function added by @Paulskpt """       
@@ -398,7 +505,7 @@ class MCP7940:
     
     def _is_pwr_failure(self):
         time_reg = bytearray()  # added by @PaulskPt
-        time.reg.append(REGISTER_PWR_FAIL)
+        time.reg.append(MCP7940.REGISTER_PWR_FAIL)
         if my_debug:
             print(f"_is_pwr_failure(): state power failure register: {time_reg}")
         
@@ -406,39 +513,315 @@ class MCP7940:
         pwr_bit = bytearray(1)
         pass
     
+    def _clr_SQWEN_bit(self):
+        self._set_bit(0x07, MCP7940.SQWEN_BIT, 0)
+        
+    def _read_SQWEN_bit(self):
+        return self._read_bit(0x07, MCP7940.SQWEN_BIT)
+        
+    def _set_ALMPOL_bit(self, alarm_nr=None):
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+        self._set_bit(ads, MCP7940.ALMPOL_BIT, 1)  # Set ALMPOL bit for Alarm1
+        if my_debug:
+            ck_bit = self._read_ALMPOL_bit(alarm_nr)
+            print("MCP7940._set_ALMPOL_bit() for alarm{:d}: check: b\'{:b}\'".format(alarm_nr, ck_bit))
+        
+    def _clr_ALMPOL_bit(self, alarm_nr=None):
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+        if my_debug:
+            print("MCP7940._clr_ALMPOL_bit() for alarm{:d}: we passed here. Line 504".format(alarm_nr))
+        self._set_bit(ads, MCP7940.ALMPOL_BIT, 0)  # Set ALMPOL bit for Alarm1
+        
+    def _read_ALMPOL_bit(self, alarm_nr=None):
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+        ret =  self._read_bit(ads, MCP7940.ALMPOL_BIT)
+        if my_debug:
+            print("MCP7940._read_AMPOL_bit for alarm{:d}, value: b\'{:b}\'".format(alarm_nr, ret))
+        return ret
+    
+    def _read_ALMxIF_bit(self, alarm_nr=None):
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+        return self._read_bit(ads, MCP7940.ALMxIF_BIT)
+    
+    def _clr_ALMxIF_bit(self, alarm_nr=None):
+        TAG = "MCP7940._clr_ALMxIF_bit():  "
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+
+        current = bytearray(1)
+        reg_buf = bytearray()
+        reg_buf.append(ads)
+        out_buf = bytearray()
+        out_buf.append(ads)
+
+        try:
+            while not self._i2c.try_lock():
+                pass
+            self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, current)
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+            
+        if my_debug:
+            print(TAG+"received ALM{:d} weekday value register: lst(current): {}, value: 0x{:0x}, in binary: b\'{:08b}\'". \
+                format(alarm_nr, list(current), current[0], current[0]))
+        updated = current[0]
+        updated = updated & 0xF7 # clear the ALMxIF bit
+        out_buf.append(updated)
+        
+        if my_debug:
+            print(TAG+"writing value, hex: 0x{:02x}, binary: b\'{:08b}\'".format(updated, updated) )
+            
+        try:
+            while not self._i2c.try_lock():
+                pass 
+            self._i2c.writeto(MCP7940.ADDRESS, out_buf)  # send data
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+        reg_buf = bytearray()
+        reg_buf.append(ads)
+        ck_buf = bytearray(1)
+        try:
+            while not self._i2c.try_lock():
+                pass
+            self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, ck_buf)
+            ck_if_bit = ck_buf[0]
+            ck_if_bit2 = ck_if_bit & 0x7F # isolate b3
+            ck_if_bit2 = ck_if_bit2 >> 3  # shift b3 to b0
+            if my_debug:
+                print(TAG+"check weekday value register rcvd 2nd time: 0x{:02x}, IF bit: hex: 0x{:x}, binary: b\'{:b}\'". \
+                    format(ck_if_bit, ck_if_bit2, ck_if_bit2))
+                print()
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+    
+    def _read_ALMxMSK_bits(self, alarm_nr= None):
+        TAG= "MCP7940._read_ALMxMSK_bits(): "
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+        ret = 0
+        reg_buf = bytearray()
+        reg_buf.append(ads)
+        current = bytearray(1)
+        
+        try:
+            while not self._i2c.try_lock():
+                pass
+            self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, current)
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+        
+        ret = current[0] & 0x70 # isolate bits 6-4
+        ret = ret >> 4
+        
+        if my_debug and ret >= 0 and ret <= 7:
+            print(TAG+f"ret: {hex(ret)}, type of match: {self._match_lst[ret]}")
+        return ret
+    
+    def _set_ALMxMSK_bits(self, alarm_nr= None, match_type=None):
+        TAG = "MCP7940._set_ALMxMSK_bits(): "
+        if alarm_nr is None:
+            return
+        if not alarm_nr in [1, 2]:
+            return
+        if match_type is None:
+            return
+        #
+        # match type
+        # b7 b6 b5 b4 b3 b2 b1 b0
+        #  x  0  0  1  x  x  x  x = minute
+        # 
+        # b'001'  match type
+        # b'001'
+        # ----- &
+        # b'001'  result
+        #
+        # 
+        # b'001'  match type
+        # b'010'
+        # ----- &
+        # b'000'  result
+        #
+        # current2
+        # b'001'  match type
+        # b'100'
+        # ----- &
+        # b'000'  result
+        #
+        if alarm_nr == 1:
+            ads = 0x0D
+        elif alarm_nr == 2:
+            ads = 0x14
+        if match_type >= 0 and match_type <= 7:
+            mask = match_type << 4 # minutes
+        else:
+            mask = 0x00 << 4 # seconds
+        
+        current = bytearray(1)
+        reg_buf = bytearray()
+        reg_buf.append(ads)
+        out_buf = bytearray()
+        out_buf.append(ads)
+        
+        try:
+            while not self._i2c.try_lock():
+                pass
+            self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, current)
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+            
+        if my_debug:
+            print(TAG+"received ALM{:d}MSK_bits: lst(current): {}, value: 0x{:x}, binary: b\'{:b}\'". \
+                format(alarm_nr, list(current), current[0], current[0]))
+        updated = current[0]
+        updated &= 0x8F  # mask bits b6-b4
+        updated |= mask  # set for minutes
+        out_buf.append(updated)
+        if my_debug:
+            print(TAG+"writing value: {:02x}, binary: b\'{:b}\'".format(updated, updated))
+            new_match_value = updated & 0x70 # isolate bits 6-4
+            new_match_value = new_match_value >> 4
+            print(TAG+f"= new_match_value: {new_match_value} = {self._match_lst[new_match_value]}")
+            
+        try:
+            while not self._i2c.try_lock():
+                pass
+            self._i2c.writeto(MCP7940.ADDRESS, out_buf)  # send data
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+        reg_buf = bytearray()
+        reg_buf.append(ads)
+        ck_buf = bytearray(1)
+        try:
+            while not self._i2c.try_lock():
+                pass
+            self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, ck_buf)
+            if my_debug:
+                print(TAG+"check: list(ck_buf) {}, ck_buf[0] value: 0x{:02x}, binary: b\'{:08b}\'". \
+                    format(list(ck_buf), ck_buf[0], ck_buf[0]))
+        except OSError as e:
+            print(TAG+f"Error: {e}")
+            return 0
+        finally:
+            self._i2c.unlock()
+            #pass
+        if my_debug and match_type >= 0 and match_type <= 7:
+            print(TAG+"match type value set: 0x{:02x}, type of match: {:s}". \
+                format(match_type, self._match_lst[match_type]))
+            print()
+    
     def _get_time(self, start_reg = 0x00):
         TAG = "MCP7940._get_time():   "
         num_registers = 7 if start_reg == 0x00 else 6
         time_reg = bytearray(num_registers)  # added by @PaulskPt
         reg_buf = bytearray()
+    
+        if start_reg == MCP7940.CONTROL_REGISTER:
+            r = "control"
+            reg_buf.append(MCP7940.CONTROL_REGISTER)
         
+        elif start_reg == MCP7940.SRAM_START_ADDRESS:
+            r = "sram"
+            time_reg[0] = MCP7940.SRAM_START_ADDRESS
+        
+        elif start_reg == MCP7940.ALARM1_START:
+            r = "alarm0"
+            reg_buf.append(MCP7940.ALARM1_START)
+        
+        elif start_reg == MCP7940.ALARM2_START:
+            r = "alarm1"
+            reg_buf.append(MCP7940.ALARM2_START)
+        
+        elif start_reg == MCP7940.REGISTER_PWR_FAIL:
+            r = "prw_fail"
+            reg_buf.append(MCP7940.REGISTER_PWR_FAIL) 
+        
+        else:
+            r = "default"
+            reg_buf.append(MCP7940.CONTROL_REGISTER)  # default
+        
+        if my_debug:
+            print(TAG+f"using the MCP7940 {r} register")
+            print(TAG+f"reg_buf: {reg_buf}, list(reg_buf): ", end='')
+            lst = list(reg_buf)
+            le = len(lst)
+            print("[", end='')
+            for _ in range(le):
+                print(f"{hex(lst[_])}", end='')
+                if _ < le-1:
+                    print(", ", end='')
+            print("]", end='\n')
+            #print(TAG+f"bytes(MCP7940.CONTROL_REGISTER): {bytes(MCP7940.CONTROL_REGISTER)}, \
+                # list(bytes(MCP7940.CONTROL_REGISTER)): {list(bytes(MCP7940.CONTROL_REGISTER))}")
+            print(TAG+f"time_reg: {time_reg}, list(time_reg): {list(time_reg)}")
+            
         try:
             while not self._i2c.try_lock():
                 pass
-            
-            if start_reg == CONTROL_REGISTER:
-                r = "control"
-                reg_buf.append(CONTROL_REGISTER)
-            elif start_reg == SRAM_START_ADDRESS:
-                r = "sram"
-                time_reg[0] = SRAM_START_ADDRESS
-            elif start_reg == REGISTER_ALARM0:
-                r = "alarm0"
-                reg_buf.append(REGISTER_ALARM0)
-            elif start_reg == REGISTER_ALARM1:
-                r = "alarm1"
-                reg_buf.append(REGISTER_ALARM1)
-            elif start_reg == REGISTER_PWR_FAIL:
-                r = "prw_fail"
-                reg_buf.append(REGISTER_PWR_FAIL) 
-            else:
-                reg_buf.append(CONTROL_REGISTER)  # default
-            if my_debug:
-                print(TAG+f"using the MCP7940 {r} register")
-                print(TAG+f"reg_buf: {reg_buf}, list(reg_buf): {list(reg_buf)}")
-                #print(TAG+f"bytes(CONTROL_REGISTER): {bytes(CONTROL_REGISTER)}, list(bytes(CONTROL_REGISTER)): {list(bytes(CONTROL_REGISTER))}")
-                print(TAG+f"time_reg: {time_reg}, list(time_reg): {list(time_reg)}")
-            
             self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, time_reg)
             if my_debug:
                 print(TAG+"received following datetime data from MCP7940:")
@@ -456,18 +839,15 @@ class MCP7940:
         if my_debug:
             print(TAG+f"time_reg: {time_reg}")
             print(TAG+f"reg_filter: {reg_filter}")
-        #t = [self.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
-        t = bytearray()
-        for reg, filt in zip(time_reg, reg_filter):
-            n = self.bcd_to_int(reg) & filt
-            t.append(n)
-            # print(TAG+"reg {:3d}, filt {:3d}, n: {:3d}".format(reg, filt, n))
-        
+        t = [self.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
+
+        # Reorder
+        t2 = (t[MCP7940.RTCMTH], t[MCP7940.RTCDATE], t[MCP7940.RTCHOUR], \
+              t[MCP7940.RTCMIN], t[MCP7940.RTCSEC],  t[MCP7940.RTCWKDAY])
+        t3 = (t[MCP7940.RTCYEAR] + 2000,) + t2 if num_registers == 7 else t2
         if my_debug:
             print(TAG+f"t: {t}")
-        # Reorder
-        t2 = (t[MCP7940.RTCMTH], t[MCP7940.RTCDATE], t[MCP7940.RTCHOUR], t[MCP7940.RTCMIN], t[MCP7940.RTCSEC], t[MCP7940.RTCWKDAY] - 1)
-        t3 = (t[MCP7940.RTCYEAR] + 2000,) + t2
+        
         # now = (2019, 7, 16, 15, 29, 14, 6, 167)  # Sunday 2019/7/16 3:29:14pm
         # year, month, date, hours, minutes, seconds, weekday = t
         # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
@@ -546,9 +926,9 @@ class MCP7940:
     def clr_SRAM(self):
         TAG = "clr_SRAM(): "
         reg_buf = bytearray()
-        reg_buf.append(SRAM_START_ADDRESS)
+        reg_buf.append(MCP7940.SRAM_START_ADDRESS)
         out_buf = bytearray()
-        out_buf.append(SRAM_START_ADDRESS)
+        out_buf.append(MCP7940.SRAM_START_ADDRESS)
         for _ in range(0x40):
             out_buf.append(0x0)
         if my_debug:
@@ -567,7 +947,7 @@ class MCP7940:
     def show_SRAM(self):
         TAG = "show_SRAM(): "
         reg_buf = bytearray()
-        reg_buf.append(SRAM_START_ADDRESS)
+        reg_buf.append(MCP7940.SRAM_START_ADDRESS)
         in_buf = bytearray(0x3F) # 0x5F-0x20+1)
         if my_debug:
             print(TAG+"Contents of SRAM:")
@@ -601,7 +981,7 @@ class MCP7940:
             print("\n"+TAG+f"param dt: {dt}")
             print(TAG+f"length received param dt, le: {le}")
         reg_buf = bytearray()
-        reg_buf.append(SRAM_START_ADDRESS)
+        reg_buf.append(MCP7940.SRAM_START_ADDRESS)
         if my_debug:
             print(TAG+f"reg_buf: {reg_buf}, hex(list(reg_buf)[0]): {hex(list(reg_buf)[0])}")
         if le >= 8:
@@ -622,16 +1002,18 @@ class MCP7940:
             
         year, month, date, hours, minutes, seconds, weekday = dt3
         if my_debug:
-            print(TAG+f"yy: {year}, mon: {month}, dt: {date}, hr: {hours}, min: {minutes}, sec: {seconds}, wkday: {weekday}")
+            print(TAG+f"yy: {year}, mon: {month}, dt: {date}, \
+                hr: {hours}, min: {minutes}, sec: {seconds}, wkday: {weekday}")
         # Reorder
-        dt4 = [seconds, minutes, hours, weekday, date, month, year]  # Werite in reversed order (as in the registers 0x00-0x06 of the MP7940)
+        # Write in reversed order (as in the registers 0x00-0x06 of the MP7940)
+        dt4 = [seconds, minutes, hours, weekday, date, month, year]  
 
         le4 = len(dt4)
         nr_bytes = le4
         if my_debug:
             print(TAG+f"dt4: {dt4}")
         out_buf = bytearray() # 
-        out_buf.append(SRAM_START_ADDRESS)
+        out_buf.append(MCP7940.SRAM_START_ADDRESS)
         
         for _ in range(le4):  # don't save tm_yday (can be > 255) and don't save tm_isdst (can be negative)
             out_buf.append(dt4[_])
@@ -661,9 +1043,9 @@ class MCP7940:
         #dt = self._i2c.readfrom_mem(MCP7940.ADDRESS, start_reg, num_regs) # Reading datetime stamp from User SRAM
         dt = bytearray(num_regs)
         reg_buf = bytearray()
-        reg_buf.append(SRAM_START_ADDRESS)
+        reg_buf.append(MCP7940.SRAM_START_ADDRESS)
         """
-        dt[0] = SRAM_START_ADDRESS
+        dt[0] = MCP7940.SRAM_START_ADDRESS
         for _ in range(num_regs-1):
             dt[_+1] = 0
         """
@@ -695,7 +1077,8 @@ class MCP7940:
             # Reorder
             #dt2 = [year, month, date, hours, minutes, seconds, weekday]
             if my_debug:
-                print(TAG+f"yy: {year}, mon: {month}, dt: {date}, hr: {hours}, min: {minutes}, sec: {seconds}, wkday: {weekday}, yrday: {yearday}, dst: {isdst}")
+                print(TAG+f"yy: {year}, mon: {month}, dt: {date}, hr: {hours}, min: {minutes}, \
+                    sec: {seconds}, wkday: {weekday}, yrday: {yearday}, dst: {isdst}")
         except OSError as e:
             print(TAG+f"Error: {e}")
             return dt
@@ -728,7 +1111,7 @@ class MCP7940:
         def __init__(self, i2c, address):
             self._i2c = i2c
             self._address = address
-            self._memory_start = SRAM_START_ADDRESS
+            self._memory_start = MCP7940.SRAM_START_ADDRESS
             #self._memory_start = const(0x20)
 
         def __getitem__(self, key):
