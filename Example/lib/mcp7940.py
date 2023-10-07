@@ -916,17 +916,13 @@ class MCP7940:
         if my_debug:
             print(TAG+f"time_reg: {time_reg}")
             print(TAG+f"reg_filter: {reg_filter}")
-        #t = [self.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
-        t = bytearray()
-        for reg, filt in zip(time_reg, reg_filter):
-            n = self.bcd_to_int(reg) & filt
-            t.append(n)
-        
-            # print(TAG+"reg {:3d}, filt {:3d}, n: {:3d}".format(reg, filt, n))
+        t = [self.bcd_to_int(reg & filt) for reg, filt in zip(time_reg, reg_filter)]
+
         # extract weekday:
-        wd  = t[MCP7940.PWRMTH] & 0x30
+        wd  = t[MCP7940.PWRMTH] & 0xE0  # (0xE0 = b1110 0000)
+        wd = wd >> 5  # move b11100000 to b00000111
         # extract month
-        mth = t[MCP7940.PWRMTH] & 0x0F
+        mth = t[MCP7940.PWRMTH] & 0x1F  # (0x1F = b0001 1111)
         if my_debug:
             print(TAG+f"t: {t}")
         # Reorder
