@@ -26,10 +26,15 @@
 # Added self._match_lst 
 # In functions start() and stop() added functionality to wait for the osc_run_bit to change (See the MC=7940  datasheet DS20005010H-page 15, Note 2)
 # For this in function time() (Setter) I added calls to stop() and start() before and after writing a new time to the MC7940 RTC.
-# Be aware when setting an alarm time one loses the state ALMPOL bit, thye ALMxIF bit and the three ALMxMSK bits. 
+# Be aware when setting an alarm time one loses the state ALMPOL bit, the ALMxIF bit and the three ALMxMSK bits. 
 # Thus when setting an alarm make sure to set ALMPOL, ALMx1F and ALMxMSK for alarm1 and/or alarm2 in your code.py script. 
 # See the example in function set_alarm() in my code.py example.
 # For the sake of readability: replaced index values like [0] ...[6] with [RTCSEC] ... [RTCYEAR]
+#
+# About clearing the alarm Interrupt Flag bit (ALMxIF). 
+# See MCP7940 datasheet  DS20005010H-page 23, note 2
+# Writing to the ALMxWKDAY register will always clear the ALMxIF bit.
+# This is what we do in function _clr_ALMxIF_bit().
 #
 from micropython import const
 
@@ -588,6 +593,9 @@ class MCP7940:
             ads = 0x14
         return self._read_bit(ads, MCP7940.ALMxIF_BIT)
     
+    # See MCP7940 datasheet  DS20005010H-page 23, note 2
+    # Writing to the ALMxWKDAY register will always clear the ALMxIF bit.
+    # This is what we do in _clr_ALMxIF_bit() below:
     def _clr_ALMxIF_bit(self, alarm_nr=None):
         TAG = "MCP7940._clr_ALMxIF_bit():  "
         if alarm_nr is None:
