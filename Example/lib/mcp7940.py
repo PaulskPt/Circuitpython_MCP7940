@@ -4,6 +4,9 @@
 # Following are modifications by @Paulskpt (GitHub)
 # Added global debug flag `my_debug`
 # In class MCCP7940, the following functions added by @Paulskpt:
+# - set_12hr()
+# - is_12hr()
+# - is_PM()
 # - weekday_N()
 # - weekday_S()
 # - yearday()
@@ -366,6 +369,32 @@ class MCP7940:
             self._i2c.unlock()
             
         self.start()
+    
+    # See MCP7940 Datasheet DS20005010H-page 17    
+    def set_12hr(self, _12hr=None):
+        if _12hr is None:
+            return
+        if not isinstance(_12hr, bool):
+            return
+        bit = 6
+        reg = MCP7940.RTCHOUR
+            
+        self._set_bit(reg, bit, _12hr)
+    
+    # See MCP7940 Datasheet DS20005010H-page 17
+    def is_12hr(self):
+        bit = 6
+        reg = MCP7940.RTCHOUR
+        return self._read_bit(reg, bit)
+    
+    # See MCP7940 Datasheet DS20005010H-page 17
+    def is_PM(self):
+        ret = ""
+        if self.is_12hr():
+            bit = 5
+            reg = MCP7940.RTCHOUR
+            ret = "PM" if self._read_bit(reg, bit) else "AM"
+        return ret 
     
     # See datasheet  DS20005010H-page 26
     def alarm_enable(self, alarm_nr= None, onoff = False):

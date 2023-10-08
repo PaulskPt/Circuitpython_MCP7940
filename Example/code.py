@@ -365,12 +365,17 @@ def set_EXT_RTC(state):
     if my_debug:
         print(TAG+f"going to set "+eRTC+" for: {dt2}")
     mcp.time = dt2 # Set the external RTC
+    
+    # Set 12/24 hour time format
+    mcp.set_12hr(state.dt_str_usa)
+    
     ck_dt = mcp.time # Check it
     if ck_dt and len(ck_dt) >= 7:
         state.EXT_RTC_is_set = True
         state.SRAM_dt = ck_dt
         if not my_debug:
-            print(TAG+eRTC+f"updated to: {ck_dt}")
+            print(TAG+eRTC+f"updated to: {ck_dt}", end='')
+            print("{:2s}".format( mcp.is_PM() ),end='\n')  # mcp.is_PM checks if the time format is 12 hr
     else:
         state.SRAM_dt = ()
     if not my_debug:
@@ -605,10 +610,10 @@ def setup(state):
     s_rtc = "RTC datetime year "
 
     pwrud_dt = mcp.pwr_updn_dt(False)
-    if my_debug:
+    if not my_debug:
         print(TAG+f"power down timestamp: {pwrud_dt}")
     pwrud_dt = mcp.pwr_updn_dt(True)
-    if my_debug:
+    if not my_debug:
         print(TAG+f"power up timestamp: {pwrud_dt}")
         print(TAG+f"Checking for {s_mcp} power failure.")
     s_pf_yn = "Yes" if mcp.has_power_failed() else "No"
@@ -931,7 +936,10 @@ def show_alm_int_status(state):
     match1 = ""
     match2 = ""
     s1 = "+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+"
-    s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | SECOND | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |"
+    if state.dt_str_usa:
+        s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |"
+    else:
+        s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | SECOND | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |"
     ae1=mcp.alarm_is_enabled(1)
     ae2=mcp.alarm_is_enabled(2)
 
@@ -941,9 +949,14 @@ def show_alm_int_status(state):
         ts1 = state.alarm1[:6]
         if my_debug:
             print(f"alarm1 set for: {ts1}")
-        mo1, dd1, hh1, mi1, ss1, wd1 = ts1
+        if state.dt_str_usa:
+            mo1, dd1, hh1, mi1, ss1, wd1 = ts1
+            ss1 = mcp.is_PM()
+        else:
+            mo1, dd1, hh1, mi1, ss1, wd1 = ts1
+            ss1 = str(ss1)
         match1 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
-        if match1 == "mm":
+        if match1 == "mm" and not state.dt_str_usa:
             ss1 = None
     if ae2:
         alarm2en = "Yes" if ae2 else "No  "
@@ -951,7 +964,12 @@ def show_alm_int_status(state):
         ts2 = state.alarm2[:6]
         if my_debug:
             print(f"alarm2 set for: {ts2}")
-        mo2, dd2, hh2, mi2, ss2, wd2 = ts2
+        if state.dt_str_usa:
+            mo2, dd2, hh2, mi2, ss2, wd2 = ts2
+            ss2 = mcp.is_PM()
+        else:
+            mo2, dd2, hh2, mi2, ss2, wd2 = ts2
+            ss2 = str(ss2)
         match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
         if match2 == "mm":
             ss2 = None
@@ -963,17 +981,21 @@ def show_alm_int_status(state):
     #print(f"time.localtime(): {tm_current}")
     #c_yr, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, c_yd, c_isdst = tm_current
     _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _ = tm_current  # Discard year, yearday and isdst
+    if state.dt_str_usa:
+        c_ss = mcp.is_PM()
+    else:
+        c_ss = str(c_ss)
     v = "Yes " if rtc_mfp_int.value else "No  "
 
-    s3 = "|      {:s}      |    {:s}     |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:s}                   | {:18s} |". \
-        format("X","X", c_mo, c_dd, c_hh, c_mi, c_ss,mcp.DOW[c_wd][:3],"X","CURRENT DATETIME")
+    s3 = "|      {:s}      |    {:s}     |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:s}                   | {:18s} |". \
+        format("X","X", c_mo, c_dd, c_hh, c_mi, c_ss, mcp.DOW[c_wd][:3],"X","CURRENT DATETIME")
 
     if ae1:
         if ss1 is None: # We don't display seconds if we do an alarm match on minutes
             s4 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:3s}                | {:18s} |". \
             format(1, alarm1en, mo1, dd1, hh1, mi1, " X", mcp.DOW[wd1][:3], v, "ALARM1 SET FOR")
         else:
-            s4 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:3s}                | {:18s} |". \
+            s4 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:3s}                | {:18s} |". \
             format(1, alarm1en, mo1, dd1, hh1, mi1, ss1, mcp.DOW[wd1][:3], v, "ALARM1 SET FOR")
 
     if ae2:
@@ -981,7 +1003,7 @@ def show_alm_int_status(state):
             s5 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:3s}                | {:18s} |". \
             format(2, alarm2en, mo2, dd2, hh2, mi2, " X", mcp.DOW[wd2][:3], v, "ALARM2 SET FOR")
         else:
-            s5 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2d}   |   {:s}   | {:3s}                | {:18s} |". \
+            s5 = "|      {:d}      |   {:s}    |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:3s}                | {:18s} |". \
             format(2, alarm2en, mo2, dd2, hh2, mi2, ss2, mcp.DOW[wd2][:3], v, "ALARM2 SET FOR")
 
     nxt_int = mi1 if ae1 else mi2 if ae2 else -1 # Next interrupt expected at minute:
