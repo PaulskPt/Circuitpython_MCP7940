@@ -433,7 +433,7 @@ def upd_SRAM(state):
             print(TAG+f"yearday old: {yrday_old}, new: {yrday_new} ")
             print(TAG+f"result reading from SRAM: {res2}")
         le = len(res2)
-        year, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM, yearday, isdst, = res2
+        year, month, date, hours, minutes, seconds, weekday, yearday, isdst, is_12hr, is_PM = res2
 
         weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
         
