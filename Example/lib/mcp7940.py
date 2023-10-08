@@ -1050,17 +1050,34 @@ class MCP7940:
                 dt3 = (dt[_] - 2000,)
             else:
                 dt3 += (dt[_],)
+        dt3 += (self.is_12hr(),)
+        if dt.tm_hour > 12:
+            is_PM = 1
+        else:
+            is_PM = 0
+        dt3 += (is_PM,)
         if my_debug:
             print("\n"+TAG+f"dt2: {dt2}")
             print(TAG+f"MCP7940.write_to_SRAM(): Writing this datetime tuple (dt3): \'{dt3}\' to user memory (SRAM)")
             
-        year, month, date, hours, minutes, seconds, weekday = dt3
+        year, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM = dt3
+        
+        ampm = ""
+        
+        if is_12hr:
+            if hours > 12:
+                is_pm = 1
+            else:
+                is_pm = 0
+                
+                
         if my_debug:
             print(TAG+f"yy: {year}, mon: {month}, dt: {date}, \
-                hr: {hours}, min: {minutes}, sec: {seconds}, wkday: {weekday}")
+                hr: {hours}, min: {minutes}, sec: {seconds}, {ampm}, wkday: {weekday}, is_12hr: {is_12hr}, is_PM: {is_PM}")
         # Reorder
         # Write in reversed order (as in the registers 0x00-0x06 of the MP7940)
-        dt4 = [seconds, minutes, hours, weekday, date, month, year]  
+        
+        dt4 = [seconds, minutes, hours, weekday, date, month, year, is_12hr, is_PM]
 
         le4 = len(dt4)
         nr_bytes = le4
@@ -1080,9 +1097,6 @@ class MCP7940:
             while not self._i2c.try_lock():
                 pass
             self._i2c.writeto(MCP7940.ADDRESS, out_buf)   # Write the data to SRAM
-            """
-            #self._i2c.writeto_mem(MCP7940.ADDRESS, start_reg, dt3)
-            """
         except OSError as e:
             print(TAG+f"Error: {e}")
         finally:
@@ -1092,7 +1106,10 @@ class MCP7940:
     def read_fm_SRAM(self):
         """ Function added by @Paulskpt """
         TAG = "MCP7940.read_fm_SRAM():     "
-        num_regs = 7 # 1 address byte + 7 data bytes
+        if self.is_12hr():
+            num_regs = 9
+        else:
+            num_regs = 7 # 1 address byte + 7 data bytes
         dt = bytearray(num_regs)
         reg_buf = bytearray()
         reg_buf.append(MCP7940.SRAM_START_ADDRESS)
@@ -1102,36 +1119,45 @@ class MCP7940:
             while not self._i2c.try_lock():
                 pass
             self._i2c.writeto_then_readfrom(MCP7940.ADDRESS, reg_buf, dt) 
-            dt2 = list(dt)
-            if my_debug:
-                print(TAG+f"received from RTC SRAM: len(dt2): {len(dt2)}, dt: ", end='\n')
-            t = () # create an empty tuple
-            for _ in range(len(dt2)):
-                if _ == len(dt2)-1:
-                    t += (dt2[_]+2000,)
-                else:
-                    t += (dt2[_],)
-                if my_debug:
-                    print("hex: 0x{:02x}, dec: {:3d},".format(dt2[_], dt[_]), end='\n')
-            if my_debug:
-                print()
-            
-            seconds, minutes, hours, weekday, date, month, year = t
-            yearday = self.yearday((year,month,date))  # don't call self.yearday() from here. It seems to lock up the script
-            isdst = -1
-            dt2 = (year, month, date, hours, minutes, seconds, weekday, yearday, isdst)
-            # Reorder
-            #dt2 = [year, month, date, hours, minutes, seconds, weekday]
-            if my_debug:
-                print(TAG+f"yy: {year}, mon: {month}, dt: {date}, hr: {hours}, min: {minutes}, \
-                    sec: {seconds}, wkday: {weekday}, yrday: {yearday}, dst: {isdst}")
         except OSError as e:
             print(TAG+f"Error: {e}")
             return dt
         finally:
             self._i2c.unlock()
             #pass
+        dt2 = list(dt)
+        if my_debug:
+            print(TAG+f"received from RTC SRAM: len(dt2): {len(dt2)}, dt: ", end='\n')
+        t = () # create an empty tuple
+        for _ in range(len(dt2)):
+            if _ == len(dt2)-3:
+                t += (dt2[_]+2000,)
+            else:
+                t += (dt2[_],)
+            if not my_debug:
+                print("hex: 0x{:02x}, dec: {:3d},".format(dt2[_], dt[_]), end='\n')
+        if my_debug:
+            print()
         
+        seconds, minutes, hours, weekday, date, month, year, is_12hr, is_PM = t
+        yearday = self.yearday((year,month,date))  # don't call self.yearday() from here. It seems to lock up the script
+        isdst = -1
+        dt2 = (year, month, date, hours, minutes, seconds, weekday, yearday, isdst, is_12hr, is_PM)
+        # Reorder
+        #dt2 = [year, month, date, hours, minutes, seconds, weekday]
+        
+        if is_12hr:
+            if hours > 12:
+                hours -= 12
+        if is_PM:
+            s_pm = "PM"
+        else:
+            s_pm = "AM"
+        
+        if my_debug:
+            print(TAG+f"yy: {year}, mon: {month}, dt: {date}, hr: {hours}, min: {minutes}, \
+                sec: {seconds}, {s_pm}, wkday: {weekday}, yrday: {yearday}, dst: {isdst}")
+
         le = len(dt)
         if my_debug:
             print(TAG+"data read: {}, type: {}, bytes read: {}".format(dt, type(dt), le))

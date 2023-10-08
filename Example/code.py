@@ -424,15 +424,16 @@ def upd_SRAM(state):
     le = len(res)
     if len(res) >= 7:
         res2 = ()
-        for _ in range(7):
+        for _ in range(le):
             res2 += (res[_],)
-        res2 += (yrday_new,-1,)  # add yearday and isdst
+        if my_debug:
+            print(TAG+f"res2: {res2}")
+        #res2 += (yrday_new,-1,)  # add yearday and isdst
         if my_debug:
             print(TAG+f"yearday old: {yrday_old}, new: {yrday_new} ")
             print(TAG+f"result reading from SRAM: {res2}")
         le = len(res2)
-
-        year, month, date, hours, minutes, seconds, weekday, yearday, isdst = res2
+        year, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM, yearday, isdst, = res2
 
         weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
         
@@ -441,7 +442,15 @@ def upd_SRAM(state):
             month,
             date)
 
-        dt2 = "{:02d}:{:02d}:{:02d}".format(
+        if is_12hr:
+            ampm = "PM" if is_PM==1 else "AM"
+            dt2 = "{:02d}:{:02d}:{:02d} {}".format(
+            hours,
+            minutes,
+            seconds,
+            ampm)
+        else:
+            dt2 = "{:02d}:{:02d}:{:02d}".format(
             hours,
             minutes,
             seconds)
@@ -660,6 +669,8 @@ def setup(state):
 
     if state.set_EXT_RTC:
         set_EXT_RTC(state)
+    
+    gc.collect()
 
     if not my_debug:
         print()
