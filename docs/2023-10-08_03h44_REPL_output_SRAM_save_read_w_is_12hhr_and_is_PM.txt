@@ -1,0 +1,508 @@
+Sunday 2023-10-08 03h44 utc+1
+
+
+Board: Unexpected Maker ESP32S3 FeatherS3
+with Adafruit CircuitPython 9.0.0-alpha.1-50-gaa0d7aad83 
+IDE: mu-editor v1.2.0
+
+Scripts: code.py and mcp9740.py 
+
+
+
+
+
+soft reboot
+
+Auto-reload is on. Simply save files over USB to run them or enter REPL to disable.
+code.py output:
+setup():                board: 'unexpectedmaker_feathers3'
+setup():                We have NTP
+setup():                We have an internal RTC
+setup():                We have an external RTC
+setup():                power down timestamp: (0, 0, 0, 0, 0)
+setup():                power up timestamp: (0, 0, 0, 0, 0)
+setup():                Checking for MCP7940 power failure.
+setup():                MCP7940 not started yet...
+setup():                MCP7940 now started
+set_INT_RTC():          Internal (SYS) RTC is set from NTP service datetime stamp: 
+set_INT_RTC():          10/08/2023
+set_INT_RTC():          03:44:37 weekday: Sunday
+set_INT_RTC():          Note that NTP weekday starts with 0 while MCP7940 weekday starts with 1
+set_EXT_RTC():          We're going to use NTP to set the EXT RTC
+set_EXT_RTC():          NTP datetime stamp:
+set_EXT_RTC():          10/08/2023
+set_EXT_RTC():          03:44:37 weekday: Sunday, yearday: 281, isdst: -1
+MCP7940.time():         time_reg:[37, 44, 3, 7, 8, 10, 23]
+set_EXT_RTC():          External RTC (MCP7940) updated to: (2023, 10, 8, 3, 44, 37, 7, 281, -1)AM
+
+
+setup():                start setting up MCP7940
+setup():                finished setting up MCP7940
+
+main():                 loop nr: 1
+main():                 connected to "xxxxx"!
+main():                 IP address is 192.168.x.xx
+hostname():             wifi.radio.hostname= 'UMFeatherS3'
+mac():                  wifi.radio.mac_address= xx:x:xx:xx:xx:xx
+ping_test():            Resolved google address: '142.250.200.110'
+ping_test():            Ping google.com [142.250.200.110]: 22 ms
+
+
+
+
+
+
+
+
+
+NTP date:
+Sat 10/08/03
+03:44:39 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:44:42 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+
+
+
+
+
+
+
+
+
+main():                 loop nr: 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:44:56 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+main():                 loop nr: 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:45:05 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   0     |   0   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   45   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | No                  | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+
+main():                 loop nr: 4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:45:14 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   0     |   0   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   45   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | No                  | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+
+main():                 loop nr: 5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:45:24 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   0     |   0   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   45   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | No                  | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+
+main():                 loop nr: 6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:45:33 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   0     |   0   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   45   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | No                  | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+
+main():                 loop nr: 7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:45:43 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   0     |   0   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   45   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | No                  | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+
+main():                 loop nr: 8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:45:52 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   0     |   0   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   45   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | No                  | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+
+main():                 loop nr: 9
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Read from SRAM:
+2023/10/08
+03:46:02 AM
+wkday: Sunday
+yrday: 281
+dst: -1
+
+
+
+MCP7940 MFP output mode:
++--------+--------+--------+--------------------------+
+| SQWEN  | ALM0EN | ALM1EN |          Mode            |
++--------+--------+--------+--------------------------+
+|   0    |   1    |   0    | Alarm Interruput output  |
++--------+--------+--------+--------------------------+
+See: MCP7940N datasheet DS20005010H-page 25
+
+
+Single Alarm output truth table:
++--------+---------+-------+-----------------------------+
+| ALMPOL  | ALM1IF |  MFP  |         Match type          |
++--------+---------+-------+-----------------------------+
+|   1    |   1     |   1   | mask bits: 'b001' type: mm  |
++--------+---------+-------+-----------------------------+
+See: MCP7940N datasheet DS20005010H-page 27
+
+
+Alarm interrupt status:
+Expect next alarm at minute: 46
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      X      |    X     |  10   |   8 |   3  |   46   |   AM   |   Sun   | X                   | CURRENT DATETIME   |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+|      1      |   Yes    |  10   |   8 |   3  |   46   |   AM   |   Sun   | Yes                 | ALARM1 SET FOR     |
++-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
+main():                 RING RING RING we have an RTC interrupt !
+KeyboardInterrupt. Exiting...
+
+Code done running.
+
+Adafruit CircuitPython 9.0.0-alpha.1-50-gaa0d7aad83 on 2023-09-28; FeatherS3 with ESP32S3
