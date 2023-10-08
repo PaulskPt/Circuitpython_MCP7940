@@ -157,6 +157,7 @@ class MCP7940:
         self.year_day = 0
         self.is_dst = 0
         self._match_lst = ["ss", "mm", "hh", "dow", "dd", "res", "res", "all"]
+        self._match_lst_long = ["second", "minute", "hour", "weekday", "date", "reserved", "reserved", "all"]
         
     def has_power_failed(self):
         return True if self._read_bit(MCP7940.PWR_FAIL_REG, MCP7940.FAIL_BIT) else False

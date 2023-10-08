@@ -916,22 +916,29 @@ def show_mfp_output_mode_status(stete):
     print()
 
 
-def show_alarm1_output_truth_table(state):
-    if state.loop_nr < 3:
+def show_alarm_output_truth_table(state, alarm_nr=None):
+    if alarm_nr is None:
         return
+    if not alarm_nr in [1, 2]:
+        return
+    
+    s_ALMxIF = "ALM"+str(alarm_nr)+"IF"
+
     print()
-    print("Single Alarm output truth table:")
-    s1 = "+--------+---------+-------+-----------------------------+"
-    s2 = "| ALMPOL  | ALM1IF |  MFP  |         Match type          |"
-    alarm1_pol = mcp._read_ALMPOL_bit(1) # Read alarm1 ALMPOL bit
+    print(f"Single alarm output truth table for alarm{alarm_nr}:")
+    s1 = "+--------+---------+-------+----------------------------------+"
+    s2 = "| ALMPOL |  {:6s} |  MFP  |            Match type            |".format(s_ALMxIF)
+    alarm_pol = mcp._read_ALMPOL_bit(alarm_nr) # Read alarm1 or alarm2 ALMPOL bit
+    alarm_IF = mcp._read_ALMxIF_bit(alarm_nr) # Read alarm1 or alarm2 interrupt flag
+    msk = mcp._read_ALMxMSK_bits(alarm_nr) # Read ALMxMSK bits of alarm1 or alarm2
+    msk_match = mcp._match_lst_long[msk] # get the match long text equivalent
+    mfp = rtc_mfp_int.value # get the RTC shield MFP interrupt line state
+        
     if my_debug:
-        print(f"show_alarm1_output_truth_table(): alarm1_pol: {alarm1_pol}")
-    alarm1_IF = mcp._read_ALMxIF_bit(1) # Read alarm1 interrupt flag
-    mfp = rtc_mfp_int.value
-    msk1 = mcp._read_ALMxMSK_bits(1)
-    msk1_match = mcp._match_lst[msk1]
-    notes1 = "mask bits: \'b{:03b}\' type: {:3s}".format(msk1, msk1_match)
-    s3= "|   {:d}    |   {:d}     |   {:d}   | {:24s} |".format(alarm1_pol, alarm1_IF, mfp, notes1)
+        print(f"show_alarm_output_truth_table(): alarm_pol for alarm{alarm_nr}: {alarm_pol}")
+
+    notes1 = "mask bits: \'b{:03b}\' type: {:8s}".format(msk, msk_match)
+    s3= "|   {:d}    |    {:d}    |   {:d}   | {:24s} |".format(alarm_pol, alarm_IF, mfp, notes1)
     print(s1)
     print(s2)
     print(s1)
@@ -942,60 +949,58 @@ def show_alarm1_output_truth_table(state):
 
 
 def show_alm_int_status(state):
-    if state.loop_nr < 3:
-        return
     match1 = ""
     match2 = ""
+    s_sec = "AM/PM" if state.dt_str_usa else "SECOND"
     s1 = "+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+"
-    if state.dt_str_usa:
-        s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |"
-    else:
-        s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | SECOND | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |"
+    s2 = "|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | {:6s} | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |".format(s_sec)
+    
     ae1=mcp.alarm_is_enabled(1)
     ae2=mcp.alarm_is_enabled(2)
 
     if ae1:
         alarm1en = "Yes" if ae1 else "No  "
-        #ts1 = mcp.alarm1[:6]  # slice off yearday and isdst
-        ts1 = state.alarm1[:6]
+        ts1 = state.alarm1[:6]  # slice off yearday and isdst
         if my_debug:
             print(f"alarm1 set for: {ts1}")
+            
+        mo1, dd1, hh1, mi1, ss1, wd1 = ts1
+            
         if state.dt_str_usa:
-            mo1, dd1, hh1, mi1, ss1, wd1 = ts1
             ss1 = mcp.is_PM()
         else:
-            mo1, dd1, hh1, mi1, ss1, wd1 = ts1
             ss1 = str(ss1)
+            
         match1 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
         if match1 == "mm" and not state.dt_str_usa:
             ss1 = None
     if ae2:
         alarm2en = "Yes" if ae2 else "No  "
-        # ts2 = mcp.alarm2[:6]  # slice off yearday and isdst
-        ts2 = state.alarm2[:6]
+        ts2 = state.alarm2[:6]  # slice off yearday and isdst
         if my_debug:
             print(f"alarm2 set for: {ts2}")
+            
+        mo2, dd2, hh2, mi2, ss2, wd2 = ts2
+        
         if state.dt_str_usa:
-            mo2, dd2, hh2, mi2, ss2, wd2 = ts2
             ss2 = mcp.is_PM()
         else:
-            mo2, dd2, hh2, mi2, ss2, wd2 = ts2
             ss2 = str(ss2)
-        match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
-        if match2 == "mm":
+        match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(2)]
+        if match2 == "mm" and not state.dt_str_usa:
             ss2 = None
-    #tm_current = time.localtime()
+
     tm_current = mcp.time # Get current datetime stamp from the External UM MCP7940 RTC shield
     if my_debug:
         print(f"show_alm_int_status(): mcp.time: {tm_current}")
 
-    #print(f"time.localtime(): {tm_current}")
-    #c_yr, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, c_yd, c_isdst = tm_current
     _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _ = tm_current  # Discard year, yearday and isdst
+    
     if state.dt_str_usa:
         c_ss = mcp.is_PM()
     else:
         c_ss = str(c_ss)
+    
     v = "Yes " if rtc_mfp_int.value else "No  "
 
     s3 = "|      {:s}      |    {:s}     |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:s}                   | {:18s} |". \
@@ -1018,6 +1023,7 @@ def show_alm_int_status(state):
             format(2, alarm2en, mo2, dd2, hh2, mi2, ss2, mcp.DOW[wd2][:3], v, "ALARM2 SET FOR")
 
     nxt_int = mi1 if ae1 else mi2 if ae2 else -1 # Next interrupt expected at minute:
+    
     print()
     print("Alarm interrupt status:")
     if match1 == "mm" or match2 == "mm" and nxt_int != -1:
@@ -1369,8 +1375,9 @@ def main():
                 #pol_alarm_int(state)  # Check alarm interrupt
                 ck_rtc_mfp_int(state)
                 show_mfp_output_mode_status(state)
-                show_alarm1_output_truth_table(state)
-                show_alm_int_status(state)
+                if state.loop_nr >= 3:  # Only perform this
+                    show_alarm_output_truth_table(state, 1) # Show alarm output truth table for alarm1
+                    show_alm_int_status(state)
                 pol_alarm_int(state)  # Check alarm interrupt
                 if state.mfp:  # We have an interrupt!
                     print(TAG+"RING RING RING we have an RTC interrupt !")
