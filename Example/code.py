@@ -1422,6 +1422,8 @@ def main():
     state.loop_nr = 0
     state.alarm1_set = False
     alarm_start = True
+    sram_demo_cnt = 1
+    sram_demo_max_cnt = 2
     while True:
         try:
             state.loop_nr += 1
@@ -1470,14 +1472,18 @@ def main():
                 state.lStart = False
                 msg = ['NTP date:', pr_dt(state, True, 0), pr_dt(state, True, 2)]
                 pr_msg(state, msg)
-                upd_SRAM(state)
                 say_hello(True)
                 state.lStart = False
                 clr_scrn()
             else:
                 #sys.exit()
                 say_hello(False)  # Was: False
-                upd_SRAM(state)
+                if sram_demo_cnt <=  sram_demo_max_cnt:
+                    print(TAG+f"Demo nr {sram_demo_cnt} of {sram_demo_max_cnt}: save to and then read from the RTC shield\'s SRAM")
+                    upd_SRAM(state)
+                    if sram_demo_cnt <  sram_demo_max_cnt+1:
+                        sram_demo_cnt += 1
+
                 if alarm_start:
                     clr_alarm(state, 1)
                     state.alarm1_set = False
