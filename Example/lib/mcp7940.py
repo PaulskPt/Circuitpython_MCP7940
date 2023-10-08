@@ -1134,7 +1134,7 @@ class MCP7940:
                 t += (dt2[_]+2000,)
             else:
                 t += (dt2[_],)
-            if not my_debug:
+            if my_debug:
                 print("hex: 0x{:02x}, dec: {:3d},".format(dt2[_], dt[_]), end='\n')
         if my_debug:
             print()
