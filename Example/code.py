@@ -1380,7 +1380,7 @@ def main():
                     show_alm_int_status(state)
                 pol_alarm_int(state)  # Check alarm interrupt
                 if state.mfp:  # We have an interrupt!
-                    print(TAG+"RING RING RING we have an RTC interrupt !")
+                    print(TAG+"RING RING RING we have an interrupt from the RTC shield!")
                     alarm_blink(state)
                     mcp._clr_ALMxIF_bit(1) # Clear the interrupt
                     state.mfp = False
