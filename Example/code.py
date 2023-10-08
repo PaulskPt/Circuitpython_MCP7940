@@ -95,6 +95,7 @@ class State:
         self.SYS_RTC_is_set = False
         self.set_EXT_RTC = True # Set to True to update the MCP7940 RTC datetime values (and set the values of dt_dict below)
         self.EXT_RTC_is_set = False
+        self.save_dt_fm_int_rtc = False  # when save_to_SRAM, save datetime from INTernal RTC (True) or EXTernal RTC (False)
         self.dt_str_usa = True
         self.SYS_dt = None # time.localtime()
         self.SRAM_dt = None  #see setup()
@@ -362,20 +363,30 @@ def set_EXT_RTC(state):
           state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss],
           state.dt_dict[state.wd])
 
-    if my_debug:
-        print(TAG+f"going to set "+eRTC+" for: {dt2}")
-    mcp.time = dt2 # Set the external RTC
-    
+    # IMPORTANT: before setting the EXTernal RTC, set the 12/24 hour format ! 
     # Set 12/24 hour time format
     mcp.set_12hr(state.dt_str_usa)
     
+    if not my_debug:
+        print(TAG+f"going to set {eRTC} for: {dt2}")
+    # ---------------------------------------------------------------------
+    #  SET THE MCP7940 RTC SHIELD TIME
+    # ---------------------------------------------------------------------
+    mcp.time = dt2 # Set the external RTC
+    
+
+    # ---------------------------------------------------------------------
+    #  GET THE MCP7940 RTC SHIELD TIME
+    # ---------------------------------------------------------------------
     ck_dt = mcp.time # Check it
+    
     if ck_dt and len(ck_dt) >= 7:
         state.EXT_RTC_is_set = True
         state.SRAM_dt = ck_dt
         if not my_debug:
+            s_ampm = "PM" if mcp.is_PM() else "AM"
             print(TAG+eRTC+f"updated to: {ck_dt}", end='')
-            print("{:2s}".format( mcp.is_PM() ),end='\n')  # mcp.is_PM checks if the time format is 12 hr
+            print("{:2s}".format( s_ampm ),end='\n')  # mcp.is_PM checks if the time format is 12 hr
     else:
         state.SRAM_dt = ()
     if not my_debug:
@@ -389,6 +400,18 @@ def convert(lst):
         if my_debug:
             print(f"convert(): return value: {lst}")
         return lst  # return an empty tuple
+    
+# Check internal RTC for AM or PM
+# if state.dt_str_usa is True
+def int_rtc_is_PM(tm):
+    ret = False
+    if tm is not None and isinstance(tm, time.struct_time):
+        if state.dt_str_usa:
+            hour = tm.tm_hour
+            if hour >= 12:
+                ret = True
+    return ret
+ 
 
 def upd_SRAM(state):
     global SYS_dt
@@ -404,16 +427,90 @@ def upd_SRAM(state):
     else:
         if my_debug:
             print(TAG+"We\'re not going to clear SRAM. See global var \'state.use_clr_SRAM\'")
-    tm = time.localtime()
-    mcp.show_SRAM() # Show the values in the cleared SRAM space
+    
+    # Decide which datetime stamp to save: from INTernal RTC or from EXTernal RTC. Default: from EXTernal RTC
+    if state.save_dt_fm_int_rtc:
+        tm = time.localtime() # Using INTernal RTC
+        s_tm = "time.localtime()"
+        s_tm2 = "INT"
+    else:
+        tm = mcp.time  # Using EXTernal RTC
+        s_tm = "mcp.time"
+        s_tm2 = "EXT"
     if my_debug:
-        print(TAG+f"type(tm = time.localtime()): {type(tm)},\nSYS_dt: {tm}")
-    if isinstance(tm, time.struct_time):
+        print(TAG+f"tm: {tm}")
+    year, month, date, hours, minutes, seconds, weekday, yearday, isdst = tm
+    
+    dt1 = "{}/{:02d}/{:02d}".format(
+            year,
+            month,
+            date)
+
+    if state.dt_str_usa:
+        if state.save_dt_fm_int_rtc:
+            if int_rtc_is_PM(tm):
+                ampm = "PM" if int_rtc_is_PM(tm) else "AM"
+                #if hours > 12:
+                #    hours -= 12
+                dt2 = "{:02d}:{:02d}:{:02d} {}".format(
+                hours,
+                minutes,
+                seconds,
+                ampm)
+            else:
+                dt2 = "{:02d}:{:02d}:{:02d}".format(
+                hours,
+                minutes,
+                seconds)
+        else:
+            if mcp.is_12hr():
+                print(TAG+f"mcp.is_PM: {mcp.is_PM()}")
+                ampm = "PM" if mcp.is_PM() else "AM"
+                #if hours > 12:
+                #    hours -= 12
+                dt2 = "{:02d}:{:02d}:{:02d} {}".format(
+                hours,
+                minutes,
+                seconds,
+                ampm)
+            else:
+                dt2 = "{:02d}:{:02d}:{:02d}".format(
+                hours,
+                minutes,
+                seconds)
+        
+    wd = mcp.DOW[weekday]
+    # print(TAG+f"weekday: {weekday}, mcp.DOW[weekday]: {wd}")
+
+    dt3 = "wkday: {}".format(wd)
+
+    dt4 = "yrday: {}".format(yearday)
+
+    dt5 = "dst: {}".format(isdst)
+
+    msg = ["Write to SRAM:", dt1, dt2, dt3, dt4, dt5]
+    pr_msg(state, msg)
+
+    mcp.clr_SRAM()  # Empty the total SRAM
+    
+    if my_debug:
+        mcp.show_SRAM() # Show the values in the cleared SRAM space
+    
+    if my_debug:
+        print(TAG+f"type({s_tm}): {type(tm)},")
+        print(TAG+f"{s_tm2}ernal_dt: {tm}")
+    if isinstance(tm, tuple):
         if my_debug:
-            print(TAG+"going to write time.localtime() to MCP7940 SRAM")
+            print(TAG+f"we\'re going to write {s_tm} to the RTC shield\'s SRAM")
+        # -----------------------------------------------------
+        # WRITE TO SRAM
+        # -----------------------------------------------------
         mcp.write_to_SRAM(tm)
     if my_debug:
         print(TAG+"Check: result reading from SRAM:")
+    # ----------------------------------------------------------
+    # READ FROM SRAM
+    # ----------------------------------------------------------
     res = mcp.read_fm_SRAM() # read the datetime saved in SRAM
     if res is not None:
         if isinstance(tm, tuple):
@@ -435,7 +532,8 @@ def upd_SRAM(state):
         le = len(res2)
         year, month, date, hours, minutes, seconds, weekday, yearday, isdst, is_12hr, is_PM = res2
 
-        weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
+
+        # weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
         
         dt1 = "{}/{:02d}/{:02d}".format(
             year,
@@ -466,6 +564,10 @@ def upd_SRAM(state):
 
         msg = ["Read from SRAM:", dt1, dt2, dt3, dt4, dt5]
         pr_msg(state, msg)
+        
+        
+        state.SRAM_dt = convert( res ) # was: convert( mcp.read_fm_SRAM() )
+        # print(TAG+f"SRAM_dt: {SRAM_dt}. type(SRAM_dt): {type(SRAM_dt)}. len(SRAM_dt): {len(SRAM_dt)}")
 
 
 def pr_dt(state, short, choice):
@@ -674,9 +776,6 @@ def setup(state):
 
     if not my_debug:
         print()
-
-    state.SRAM_dt = convert( mcp.read_fm_SRAM() )
-    # print(TAG+f"SRAM_dt: {SRAM_dt}. type(SRAM_dt): {type(SRAM_dt)}. len(SRAM_dt): {len(SRAM_dt)}")
 
     if my_debug:
         if isinstance(state.SRAM_dt, tuple):
@@ -967,7 +1066,12 @@ def show_alm_int_status(state):
         mo1, dd1, hh1, mi1, ss1, wd1 = ts1
             
         if state.dt_str_usa:
-            ss1 = mcp.is_PM()
+            if hh1 >= 12:
+                hh1 -= 12
+                ss1 = "PM"
+            else:
+                ss1 = "AM"
+            #ss1 = "PM" if  mcp.is_PM() else "AM"
         else:
             ss1 = str(ss1)
             
@@ -983,7 +1087,12 @@ def show_alm_int_status(state):
         mo2, dd2, hh2, mi2, ss2, wd2 = ts2
         
         if state.dt_str_usa:
-            ss2 = mcp.is_PM()
+            if hh1 >= 12:
+                hh1 -= 12
+                ss1 = "PM"
+            else:
+                ss1 = "AM"
+            #ss2 = "PM" if  mcp.is_PM() else "AM"
         else:
             ss2 = str(ss2)
         match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(2)]
@@ -997,7 +1106,12 @@ def show_alm_int_status(state):
     _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _ = tm_current  # Discard year, yearday and isdst
     
     if state.dt_str_usa:
-        c_ss = mcp.is_PM()
+        if c_hh >= 12:
+            c_hh -= 12
+            c_ss = "PM"
+        else:
+            c_ss = "AM"
+        #c_ss = "PM" if  mcp.is_PM() else "AM"
     else:
         c_ss = str(c_ss)
     
