@@ -6,6 +6,7 @@
 # In class MCCP7940, the following functions added by @Paulskpt:
 # - set_12hr()
 # - is_12hr()
+# - set_PM()
 # - is_PM()
 # - weekday_N()
 # - weekday_S()
@@ -21,6 +22,7 @@
 # - _set_ALMxMSK_bits()
 # - pwr_updn_dt()
 # - clr_SRAM()
+# - show_SRAM()
 # - write_to_SRAM()
 # - read_fm_SRAM()
 # - pr_regs()
@@ -87,7 +89,7 @@ class MCP7940:
     PWRHOUR = 0x01 # reg 0x1D
     PWRDATE = 0x02 # reg 0x1E
     PWRMTH = 0x03 # reg 0x1F
-    FAIL_BIT = 4
+    PWRFAIL_BIT = 4
     OSCRUN_BIT = 5
     ALARM0EN_BIT = 4 
     ALARM1EN_BIT = 5
@@ -149,16 +151,12 @@ class MCP7940:
     def __init__(self, i2c, status=True, battery_enabled=True):
         self._i2c = i2c
         # lines added by @PaulskPt
-        self._status = status
-        self.battery_enabled = battery_enabled
-        self._numregs = 16
         self.dt_sram = bytearray()
         self._last_rtc_time = ()  # copy here the last time received with self._get_time()
         #                       merely to be used by set_PM, to not call self._get_time while it is running
         self.year_day = 0
         self.is_dst = 0
         self._match_lst = ["ss", "mm", "hh", "dow", "dd", "res", "res", "all"]
-        self._match_lst_long = ["second", "minute", "hour", "weekday", "date", "reserved", "reserved", "all"]
         
     def has_power_failed(self):
         return True if self._read_bit(MCP7940.PWR_FAIL_REG, MCP7940.FAIL_BIT) else False
@@ -600,10 +598,12 @@ class MCP7940:
         return ndays
     
     def _is_pwr_failure(self):
-        time_reg = bytearray()  # added by @PaulskPt
-        time.reg.append(MCP7940.REGISTER_PWR_FAIL)
+        reg = MCP7940.RTCWKDAY
+        bit = MCP7940.PWRFAIL_BIT
+        ret = self._read_bit(reg, bit)
         if my_debug:
-            print(f"_is_pwr_failure(): state power failure register: {time_reg}")
+            print(f"_is_pwr_failure(): state power failure register: {ret}")
+        return ret
         
     def _clr_pwr_failure_bit(self):
         pwr_bit = bytearray(1)
