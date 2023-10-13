@@ -575,9 +575,15 @@ class MCP7940:
     # Return the weekday as an integeradded by @Paulskpt """
     """ Function added by @Paulskpt """
     def weekday_N(self):
+        TAG = "weekday_N(): "
         dt = self._get_time()
         le = len(dt)
-        return dt[le-1:][0] # dt[le-1:] results in tuple: (0,) so we have to extract the first element.
+         # Year, month, mday, hour, minute, second, weekday, yearday, is_12hr, isPM
+        _, _, _, _, _, _, weekday, _, _, _, _ = dt # we don't need: year, month, date, hour, minute, second, yearday, is_12hr, is_PM
+        if my_debug:
+            print(TAG+f"weekday: {weekday}")
+            
+        return weekday
     
     # Return the weekday as a string
     """ Function added by @Paulskpt """
