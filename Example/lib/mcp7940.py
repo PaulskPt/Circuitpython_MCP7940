@@ -156,7 +156,6 @@ class MCP7940:
         self.dt_sram = bytearray()
         self._last_rtc_time = ()  # copy here the last time received with self._get_time()
         #                       merely to be used by set_PM, to not call self._get_time while it is running
-        self.year_day = 0
         self.is_dst = 0
         self._match_lst = ["ss", "mm", "hh", "dow", "dd", "res", "res", "all"]
         
@@ -590,8 +589,6 @@ class MCP7940:
     def yearday(self, dt0=None):
         if my_debug:
             print(f"yearday(): param dt0: {dt0}")
-        if self.year_day != 0:
-            return self.year_day
         
         if dt0 is not None: 
             # Prevent 'hang' when called fm self._get_time(),
@@ -1012,13 +1009,10 @@ class MCP7940:
         # year, month, date, hours, minutes, seconds, weekday = t
         # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
 
-        if self.year_day == 0:
-            yrday = self.yearday(t3)
-            if my_debug:
-                print(f"yearday rcvd from within _get_time(): {yrday}")
-            self.year_day = yrday # Set yearday
-        else:
-            yrday = self.year_day
+ 
+        yrday = self.yearday(t3)
+        if my_debug:
+            print(f"yearday rcvd from within _get_time(): {yrday}")
             
         if self.is_dst == 0:
             isdst = -1
