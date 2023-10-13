@@ -11,6 +11,8 @@
 # - weekday_N()
 # - weekday_S()
 # - yearday()
+# - is_pwr_failur()
+# - clr_pwr_failure_bit()
 # - _clr_SQWEN_bit()
 # - _read_SQWEN_bit()
 # - _set_ALMPOL_bit()
