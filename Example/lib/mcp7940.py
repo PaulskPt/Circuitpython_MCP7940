@@ -300,8 +300,8 @@ class MCP7940:
     def time(self):
         return self._get_time()
 
-    """ Function modified by @PaulskPt """
     # Added calls to self.stop() and self.start()
+    """ Function modified by @PaulskPt """
     @time.setter
     def time(self, t):
         """
@@ -1152,7 +1152,6 @@ class MCP7940:
     # Write datetime stamp to SRAM
     """ Function added by @Paulskpt """  
     def write_to_SRAM(self, dt):
-        """ Function added by @Paulskpt """
         TAG="MCP7940.write_to_SRAM():    "
         le = len(dt)
         if my_debug:
@@ -1225,7 +1224,6 @@ class MCP7940:
     # Read datetime stamp from SRAM
     """ Function added by @Paulskpt """
     def read_fm_SRAM(self):
-        """ Function added by @Paulskpt """
         TAG = "MCP7940.read_fm_SRAM():     "
         is_12hr = self.is_12hr()
         if is_12hr:
