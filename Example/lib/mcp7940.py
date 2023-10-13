@@ -988,6 +988,17 @@ class MCP7940:
         if my_debug:
             print(TAG+f"t: {t}")
             
+        if self._is_12hr > -1:
+            is_12hr = self._is_12hr
+        else:
+            is_12hr = self.is_12hr()
+        
+        if is_12hr:
+            # If value of hour is more than 24 this is an indication that the 23/24hr bit and/or the AM/PM bit are set
+            # so we have to mask these two bits to get a proper hour readout.
+            if t[MCP7940.RTCHOUR] > 0x18:  # 24 hours 
+                t[MCP7940.RTCHOUR] &= 0x1F  # suppress the 12/24hr bit and the AM/PM bit (if present)
+            
         # Reorder
         if self.is_12hr():
             if my_debug:
@@ -1014,13 +1025,21 @@ class MCP7940:
         if my_debug:
             print(f"yearday rcvd from within _get_time(): {yrday}")
             
-        if self.is_dst == 0:
-            isdst = -1
-            self.is_dst = isdst
-        else:
-            isdst = self.is_dst
+        isdst = -1
         
         t3 += (yrday, isdst)  # add yearday and isdst to datetime stamp
+        
+        t3 += (is_12hr,)
+        if is_12hr:
+            if  t[MCP7940.RTCHOUR] >= 12:
+                self.set_PM(True)
+            else:
+                self.set_PM(False)
+        is_PM = self.is_PM()
+        if my_debug:
+            print(TAG+f"_is_12hr: {is_12hr}, is_PM: {is_PM}")
+        t3 += (is_PM,)
+        
         if start_reg == MCP7940.CONTROL_REGISTER:
             # Only copy when this time is the time of the TIMEKEEPING registers
             self._last_rtc_time = t3 # copy the current time
