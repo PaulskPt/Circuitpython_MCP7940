@@ -684,7 +684,7 @@ def pr_dt(state, short, choice):
     ss = now[state.ss]
     wd = now[state.wd]
 
-    dow = mcp.DOW[wd]
+    dow = mcp.DOW[wd+1]
 
     swd = dow[:3] if short else dow
 
