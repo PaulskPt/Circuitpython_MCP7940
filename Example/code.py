@@ -29,21 +29,21 @@
     to and from the MCP7940 user space in its SRAM.
     The MCP7940 RTC needs only to be set when the RTC has been without power or not has been set before.
     When you need more (debug) output to the REPL, set the global variable 'my_debug' to True.
-    
+
     Note that NTP weekday starts with 0. Also time.localtime element tm_wday ranges 0-6 while MCP7940 weekday range is 1-7.
     For this reason we use a mRTC_DOW dictionary in the State Class in this file and
     Then in three places corrections are performed:
     a DOW dictionary in the MCP7940 Class in the file lib/mcp7940.py.
     a) In function set_EXT_RTC() we do the following:
         dt = time.localtime()
-        state.dt_dict[state.wd] = dt.tm_wday + 1 
+        state.dt_dict[state.wd] = dt.tm_wday + 1
     b) In function set_alarm() we do the following:
         t1 = time.time()  # get seconds since epoch
-        dt = time.localtime(t1+(mins_fm_now*60)) # convert mins_fm_now to seconds    
-        weekday = dt.tm_wday + 1    
+        dt = time.localtime(t1+(mins_fm_now*60)) # convert mins_fm_now to seconds
+        weekday = dt.tm_wday + 1
     c) In function upd_SRAM(), after reading the datetime stamp from SRAM we add a correction:
         weekday += 1
-    
+
     Want to see more of my work: Github @PaulskPt
 
 """
@@ -137,8 +137,9 @@ class State:
         self.alarm1_set = False
         self.alarm2_set = False
         self.mfp = False
+        self._match_lst_long = ["second", "minute", "hour", "weekday", "date", "reserved", "reserved", "all"]
         self.mRTC_DOW = DOW =  \
-        { 
+        {
             0: "Monday",
             1: "Tuesday",
             2: "Wednesday",
@@ -146,6 +147,20 @@ class State:
             4: "Friday",
             5: "Saturday",
             6: "Sunday"
+        }
+        self.month_dict = {
+            1: "Jan",
+            2: "Feb",
+            3: "Mar",
+            4: "Apr",
+            5: "May",
+            6: "Jun",
+            7: "Jul",
+            8: "Aug",
+            9: "Sep",
+            10: "Oct",
+            11: "Nov",
+            12: "Dec"
         }
 
 
@@ -305,7 +320,7 @@ def set_INT_RTC(state):
         state.SYS_RTC_is_set = True
         if state.SYS_dt.tm_year >= 2000:
              print(TAG+s1+"NTP service "+s2)
-             
+
     elif state.EXT_RTC_is_set:
         mRTC = mcp.time
         state.SYS_RTC_is_set = True
@@ -363,23 +378,30 @@ def set_EXT_RTC(state):
           state.dt_dict[state.hh], state.dt_dict[state.mm], state.dt_dict[state.ss],
           state.dt_dict[state.wd])
 
-    # IMPORTANT: before setting the EXTernal RTC, set the 12/24 hour format ! 
+    # IMPORTANT: before setting the EXTernal RTC, set the 12/24 hour format !
     # Set 12/24 hour time format
+    if not my_debug:
+        print(TAG+f"setting MCP7940.is_12hr to: {state.dt_str_usa}")
     mcp.set_12hr(state.dt_str_usa)
     
+    # Check:
+    if not my_debug:
+        ck = mcp.is_12hr()
+        print(TAG+f"ckeck: state of mcp.is_12hr(): {ck}")
+
     if not my_debug:
         print(TAG+f"going to set {eRTC} for: {dt2}")
     # ---------------------------------------------------------------------
     #  SET THE MCP7940 RTC SHIELD TIME
     # ---------------------------------------------------------------------
     mcp.time = dt2 # Set the external RTC
-    
+
 
     # ---------------------------------------------------------------------
     #  GET THE MCP7940 RTC SHIELD TIME
     # ---------------------------------------------------------------------
     ck_dt = mcp.time # Check it
-    
+
     if ck_dt and len(ck_dt) >= 7:
         state.EXT_RTC_is_set = True
         state.SRAM_dt = ck_dt
@@ -392,15 +414,6 @@ def set_EXT_RTC(state):
     if not my_debug:
         print()
 
-# Convert a list to a tuple
-def convert(lst):
-    if isinstance(lst, list):
-        return tuple(i for i in lst)
-    else:
-        if my_debug:
-            print(f"convert(): return value: {lst}")
-        return lst  # return an empty tuple
-    
 # Check internal RTC for AM or PM
 # if state.dt_str_usa is True
 def int_rtc_is_PM(tm):
@@ -411,15 +424,76 @@ def int_rtc_is_PM(tm):
             if hour >= 12:
                 ret = True
     return ret
- 
+
+# This function has been created
+# When a call to mcp.is_12hr() is positive,
+# the hours will be changed from 24 to 12 hour fomat:
+# AM/PM will be added to the datetime stamp
+def add_12hr(t):
+    TAG = tag_adj(state, "add_12hr()): ")
+    if not isinstance(t, tuple):
+        return
+    num_registers = len(t)
+    if my_debug:
+        print(TAG+f"num_registers: {num_registers}")
+    if num_registers == 6: 
+        year, month, date, hours, minutes, seconds = t
+    elif num_registers == 7:
+        year, month, date, hours, minutes, seconds, weekday = t
+    #num_registers = 7 if start_reg == 0x00 else 6
+    is_12hr = 1 if state.dt_str_usa else 0
+    
+    if is_12hr:
+        if my_debug:
+            print(TAG+f"hours: {hours}")
+        if hours >= 12:
+            is_PM = 1
+        else:
+            is_PM = 0
+        # If value of hour is more than 24 this is an indication that the 23/24hr bit and/or the AM/PM bit are set
+        # so we have to mask these two bits to get a proper hour readout.
+        if hours > 0x18:  # 24 hours 
+            hours &= 0x1F  # suppress the 12/24hr bit and the AM/PM bit (if present)
+        if hours > 12:  # After the previous check: if hours > 0x18
+            hours -= 12
+    else:
+        is_PM = 0
+        
+    if my_debug:
+        print(TAG+f"_is_12hr: {is_12hr}, is_PM: {is_PM}")
+
+    t2 = (month, date, hours, \
+            minutes, seconds,  weekday)
+    t3 = (year,) + t2 if num_registers == 7 else t2
+
+    if my_debug:
+        print(TAG+f"t2: {t2}")
+    # now = (2019, 7, 16, 15, 29, 14, 6, 167)  # Sunday 2019/7/16 3:29:14pm
+    # year, month, date, hours, minutes, seconds, weekday = t
+    # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
+
+    """
+    yrday = mcp.yearday(t3)
+    if my_debug:
+        print(f"yearday: {yrday}")
+        
+    isdst = -1
+    """
+    # t3 += (yrday, isdst, is_12hr, is_PM)  # add yearday and isdst to datetime stamp
+    t3 += (is_12hr, is_PM)  # add yearday and isdst to datetime stamp
+    
+    if my_debug:
+        print(TAG+f"return value: {t3}")
+
+    return t3
+
 
 def upd_SRAM(state):
     global SYS_dt
     TAG = tag_adj(state, "upd_SRAM(): ")
+    num_registers = 0
     res = None
-    res2 = None
-    yrday_old = -1
-    yrday_new = -1
+
     if state.use_clr_SRAM:
         if my_debug:
             print(TAG+"First we go to clear the SRAM data space")
@@ -439,7 +513,17 @@ def upd_SRAM(state):
         s_tm2 = "EXT"
     if my_debug:
         print(TAG+f"tm: {tm}")
-    year, month, date, hours, minutes, seconds, weekday, yearday, isdst = tm
+        
+    tm2 = add_12hr(tm)  # Add is_12hr, is_PM and adjust hours for 12 hour time format
+    
+    if my_debug:
+        print(TAG+f"tm2: {tm2}")
+        
+    # year, month, date, hours, minutes, seconds, weekday, yearday, isdst = tm
+    # year, month, date, hours, minutes, seconds, weekday, yearday, isdst, is_12hr, is_PM = tm2
+    year, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM = tm2
+    
+    tm3 = (year-2000, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM)
     
     dt1 = "{}/{:02d}/{:02d}".format(
             year,
@@ -447,48 +531,30 @@ def upd_SRAM(state):
             date)
 
     if state.dt_str_usa:
-        if state.save_dt_fm_int_rtc:
-            if int_rtc_is_PM(tm):
-                ampm = "PM" if int_rtc_is_PM(tm) else "AM"
-                #if hours > 12:
-                #    hours -= 12
-                dt2 = "{:02d}:{:02d}:{:02d} {}".format(
-                hours,
-                minutes,
-                seconds,
-                ampm)
-            else:
-                dt2 = "{:02d}:{:02d}:{:02d}".format(
-                hours,
-                minutes,
-                seconds)
+        if is_12hr:
+            ampm = "PM" if is_PM else "AM"
+            dt2 = "{:d}:{:02d}:{:02d} {}".format(
+            hours,
+            minutes,
+            seconds, 
+            ampm)
         else:
-            if mcp.is_12hr():
-                print(TAG+f"mcp.is_PM: {mcp.is_PM()}")
-                ampm = "PM" if mcp.is_PM() else "AM"
-                #if hours > 12:
-                #    hours -= 12
-                dt2 = "{:02d}:{:02d}:{:02d} {}".format(
-                hours,
-                minutes,
-                seconds,
-                ampm)
-            else:
-                dt2 = "{:02d}:{:02d}:{:02d}".format(
-                hours,
-                minutes,
-                seconds)
+            dt2 = "{:02d}:{:02d}:{:02d}".format(
+            hours,
+            minutes,
+            seconds)
+
         
     wd = mcp.DOW[weekday]
     # print(TAG+f"weekday: {weekday}, mcp.DOW[weekday]: {wd}")
 
     dt3 = "wkday: {}".format(wd)
+    
+    dt6 = "is_12hr: {}".format(is_12hr)
+    
+    dt7 = "is_PM: {}".format(is_PM)
 
-    dt4 = "yrday: {}".format(yearday)
-
-    dt5 = "dst: {}".format(isdst)
-
-    msg = ["Write to SRAM:", dt1, dt2, dt3, dt4, dt5]
+    msg = ["Write to SRAM:", dt1, dt2, dt3, dt6, dt7]
     pr_msg(state, msg)
 
     mcp.clr_SRAM()  # Empty the total SRAM
@@ -505,44 +571,53 @@ def upd_SRAM(state):
         # -----------------------------------------------------
         # WRITE TO SRAM
         # -----------------------------------------------------
-        mcp.write_to_SRAM(tm)
+        mcp.write_to_SRAM(tm3)
     if my_debug:
         print(TAG+"Check: result reading from SRAM:")
     # ----------------------------------------------------------
     # READ FROM SRAM
     # ----------------------------------------------------------
     res = mcp.read_fm_SRAM() # read the datetime saved in SRAM
-    if res is not None:
-        if isinstance(tm, tuple):
-            yrday_old = res[7]
-            yrday_new = mcp.yearday(res)
-    else:
+    if res is None:
         res = ()
-    le = len(res)
-    if len(res) >= 7:
-        res2 = ()
-        for _ in range(le):
-            res2 += (res[_],)
+    
+    if len(res) > 0:
+        num_registers = res[0]
+        if num_registers == 0:
+            print(TAG+f"no datetime stamp data received")
+            return
+        
+        rdl = "received datetime stamp length: {:d}".format(num_registers-1)
+        yearday = mcp.yearday(res[1:])  # slice off byte 0 (= num_registers)
+        isdst = -1
+        
         if my_debug:
-            print(TAG+f"res2: {res2}")
-        #res2 += (yrday_new,-1,)  # add yearday and isdst
-        if my_debug:
-            print(TAG+f"yearday old: {yrday_old}, new: {yrday_new} ")
-            print(TAG+f"result reading from SRAM: {res2}")
-        le = len(res2)
-        year, month, date, hours, minutes, seconds, weekday, yearday, isdst, is_12hr, is_PM = res2
+            print(TAG+f"{rdl}")
+            print(TAG+f"received from SRAM: {res[1:]}")
+            print(TAG+f"yearday {yearday}, isdst: {isdst} ")
+        
+        if num_registers == 8:
+            _, year, month, date, weekday, hours, minutes, seconds  = res  # don't use nr_bytes again
+        elif num_registers == 10:
+            _, year, month, date, weekday, hours, minutes, seconds, is_12hr, is_PM = res # don't use nr_bytes again
 
+        year += 2000
 
         # weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
-        
-        dt1 = "{}/{:02d}/{:02d}".format(
-            year,
-            month,
-            date)
+        if state.dt_str_usa:
+            dt1 = "{:s} {:02d} {:d}".format(
+                state.month_dict[month],
+                date,
+                year)
+        else:
+            dt2 = "{:d}{:02d}/{:02d}".format(
+                date,
+                month,
+                year)
 
         if is_12hr:
             ampm = "PM" if is_PM==1 else "AM"
-            dt2 = "{:02d}:{:02d}:{:02d} {}".format(
+            dt2 = "{:d}:{:02d}:{:02d} {}".format(
             hours,
             minutes,
             seconds,
@@ -561,13 +636,21 @@ def upd_SRAM(state):
         dt4 = "yrday: {}".format(yearday)
 
         dt5 = "dst: {}".format(isdst)
+        
+        dt6 = "is_12hr: {}".format(is_12hr)
+    
+        dt7 = "is_PM: {}".format(is_PM)
 
-        msg = ["Read from SRAM:", dt1, dt2, dt3, dt4, dt5]
+        msg = ["Read from SRAM:", dt1, dt2, dt3, dt6, dt7, "Added: ", dt4, dt5]
+        
         pr_msg(state, msg)
         
+        state.SRAM_dt = (year, month, date, weekday, hours, minutes, seconds, is_12hr, is_PM) # skip byte 0 = num_regs
         
-        state.SRAM_dt = convert( res ) # was: convert( mcp.read_fm_SRAM() )
-        # print(TAG+f"SRAM_dt: {SRAM_dt}. type(SRAM_dt): {type(SRAM_dt)}. len(SRAM_dt): {len(SRAM_dt)}")
+        if my_debug:
+            sdt = state.SRAM_dt
+            sdt_s = "state.SRAM_dt"
+            print(TAG+f"{sdt_s}: {sdt}. type({sdt_s}): {type(sdt)}. len({sdt_s}): {len(sdt)}")
 
 
 def pr_dt(state, short, choice):
@@ -593,7 +676,7 @@ def pr_dt(state, short, choice):
         choice2 = DT_ALL
 
     now = time.localtime()
-    yy = now[state.hh]
+    yy = now[state.yy]
     mm = now[state.mo]
     dd = now[state.dd]
     hh = now[state.hh]
@@ -618,8 +701,9 @@ def pr_dt(state, short, choice):
         if hh == 0:
             hh = 12
 
-        dt1 = "{:d}/{:02d}/{:02d}".format(mm, dd, yy)
-        dt2 = "{:02d}:{:02d}:{:02d} {:s}".format(hh, mi, ss, ampm)
+        #dt1 = "{:d}/{:02d}/{:02d}".format(mm, dd, yy)
+        dt1 = "{:s} {:02d} {:02d}".format(state.month_dict[mm], dd, yy)
+        dt2 = "{:d}:{:02d}:{:02d} {:s}".format(hh, mi, ss, ampm)
     else:
         dt1 = "{:d}-{:02d}-{:02d}".format(yy, mm, dd)
         dt2 = "{:02d}:{:02d}:{:02d}".format(hh, mi, ss)
@@ -771,7 +855,7 @@ def setup(state):
 
     if state.set_EXT_RTC:
         set_EXT_RTC(state)
-    
+
     gc.collect()
 
     if not my_debug:
@@ -792,22 +876,22 @@ def setup(state):
 
     if not my_debug:
         print(TAG+"start setting up MCP7940")
-        
+
     mcp._clr_SQWEN_bit()  # Clear the Square Wave Enable bit
     mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
     mcp._clr_ALMxIF_bit(1)     # Clear the interrupt of alarm1
     mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
     state.alarm1_int = False
     mcp.alarm_enable(1, True)     # Enable alarm1
-    
+
     mcp._set_ALMPOL_bit(2) # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
     mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm2
     mcp._set_ALMxMSK_bits(2,1) # Set the alarm3 mask bits for a minutes match
     state.alarm2_int = False
     mcp.alarm_enable(2, False)     # Disable alarm2
-    
+
     state.mfp = rtc_mfp_int.value
-    
+
     if not my_debug:
         print(TAG+"finished setting up MCP7940")
     # prepare_alm_int(state)  # Prepare for alarm interrupt polling
@@ -849,7 +933,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
     # print(TAG+f"weekday: {weekday}")
 
     t = month, date, hours, minutes, seconds, weekday
-        
+
     if alarm1en and alarm_nr == 1:
         if my_debug:
             print(TAG+f"setting alarm1 for: {t[:5]}, {dow}")
@@ -859,7 +943,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
             print(TAG+f"check: alarm1 is set for: {t_ck}")
         state.alarm1 = t_ck
         state.alarm1_set = True
-        # IMPORTANT NOTE: 
+        # IMPORTANT NOTE:
         # ===============
         # I experienced that if mcp.alarm1 (or mcp.alarm2) is called earlier setting of the ALMPOL bit is reset,
         # that is why we set the ALMPOL bit again (below)
@@ -1020,7 +1104,7 @@ def show_alarm_output_truth_table(state, alarm_nr=None):
         return
     if not alarm_nr in [1, 2]:
         return
-    
+
     s_ALMxIF = "ALM"+str(alarm_nr)+"IF"
 
     print()
@@ -1030,9 +1114,9 @@ def show_alarm_output_truth_table(state, alarm_nr=None):
     alarm_pol = mcp._read_ALMPOL_bit(alarm_nr) # Read alarm1 or alarm2 ALMPOL bit
     alarm_IF = mcp._read_ALMxIF_bit(alarm_nr) # Read alarm1 or alarm2 interrupt flag
     msk = mcp._read_ALMxMSK_bits(alarm_nr) # Read ALMxMSK bits of alarm1 or alarm2
-    msk_match = mcp._match_lst_long[msk] # get the match long text equivalent
+    msk_match = state._match_lst_long[msk] # get the match long text equivalent
     mfp = rtc_mfp_int.value # get the RTC shield MFP interrupt line state
-        
+
     if my_debug:
         print(f"show_alarm_output_truth_table(): alarm_pol for alarm{alarm_nr}: {alarm_pol}")
 
@@ -1048,6 +1132,7 @@ def show_alarm_output_truth_table(state, alarm_nr=None):
 
 
 def show_alm_int_status(state):
+    TAG = tag_adj(state, "show_alm_int_status(): ")
     match1 = ""
     match2 = ""
     s_sec = "AM/PM" if state.dt_str_usa else "SECOND"
@@ -1061,12 +1146,12 @@ def show_alm_int_status(state):
         alarm1en = "Yes" if ae1 else "No  "
         ts1 = state.alarm1[:6]  # slice off yearday and isdst
         if my_debug:
-            print(f"alarm1 set for: {ts1}")
+            print(TAG+f"alarm1 set for: {ts1}")
             
         mo1, dd1, hh1, mi1, ss1, wd1 = ts1
             
         if state.dt_str_usa:
-            if hh1 >= 12:
+            if hh1 > 12:
                 hh1 -= 12
                 ss1 = "PM"
             else:
@@ -1082,12 +1167,12 @@ def show_alm_int_status(state):
         alarm2en = "Yes" if ae2 else "No  "
         ts2 = state.alarm2[:6]  # slice off yearday and isdst
         if my_debug:
-            print(f"alarm2 set for: {ts2}")
+            print(TAG+f"alarm2 set for: {ts2}")
             
         mo2, dd2, hh2, mi2, ss2, wd2 = ts2
         
         if state.dt_str_usa:
-            if hh1 >= 12:
+            if hh1 > 12:
                 hh1 -= 12
                 ss1 = "PM"
             else:
@@ -1101,12 +1186,21 @@ def show_alm_int_status(state):
 
     tm_current = mcp.time # Get current datetime stamp from the External UM MCP7940 RTC shield
     if my_debug:
-        print(f"show_alm_int_status(): mcp.time: {tm_current}")
+        print(TAG+f"mcp.time: {tm_current}")
 
-    _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _ = tm_current  # Discard year, yearday and isdst
+    num_registers = len(tm_current)
+    if my_debug:
+        print(TAG+f"num_registers: {num_registers}")
+    
+    if num_registers == 7:
+        _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd = tm_current # Discard year
+    elif num_registers == 9:
+        _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _ = tm_current  # Discard year, yearday and isdst
+    elif num_registers == 11:
+        _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _, _, _ = tm_current  # Discard year, yearday and isdst, is_12hr, is_PM
     
     if state.dt_str_usa:
-        if c_hh >= 12:
+        if c_hh > 12:
             c_hh -= 12
             c_ss = "PM"
         else:
@@ -1153,6 +1247,7 @@ def show_alm_int_status(state):
     if ae2:
         print(s5) # idem
         print(s1)
+
 
 
 def alarm_blink(state):
