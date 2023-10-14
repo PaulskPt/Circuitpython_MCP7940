@@ -174,6 +174,35 @@ class MCP7940:
     
     def clr_pwr_fail_bit(self):
         self._set_bit(MCP7940.PWR_FAIL_REG, MCP7940.PWRFAIL_BIT, 0)
+        
+    """
+    # See datasheet: DS20005010H-page 18
+    # Function added by @Paulskpt 
+    def _is_pwr_failure(self):
+        reg = MCP7940.RTCWKDAY
+        bit = MCP7940.PWRFAIL_BIT
+        ret = self._read_bit(reg, bit)
+        if my_debug:
+            print(f"_is_pwr_failure(): state power failure register: {ret}")
+        return ret
+    
+    # See datasheet DS20005010H-page 18, Note 2
+    # Function added by @Paulskpt 
+    def _clr_pwr_failure_bit(self):
+        if self._is_pwr_failure():
+            # Only clear the pwr_failure_bit when that bit has been set
+            # Clearing it by writing a time to the MCP7940 timekeeping registers
+            # and so writing to the TIMEKEEPING WEEKDAY VALUE REGISTER too.
+            # This clears the PWRFAIL bit.
+            self.time = self._get_time(MCP7940.CONTROL_REGISTER)
+            if not my_debug:
+                print("PWRFAIL bit cleared")
+            return True
+        else:
+            if not my_debug:
+                print("There has not been a power failure.")
+        return False
+    """
     
     def start(self):
         ads = 0x3
@@ -618,34 +647,7 @@ class MCP7940:
         ndays += curr_date
         yearday = ndays
         return ndays
-    """
-    # See datasheet: DS20005010H-page 18
-    # Function added by @Paulskpt 
-    def _is_pwr_failure(self):
-        reg = MCP7940.RTCWKDAY
-        bit = MCP7940.PWRFAIL_BIT
-        ret = self._read_bit(reg, bit)
-        if my_debug:
-            print(f"_is_pwr_failure(): state power failure register: {ret}")
-        return ret
-    
-    # See datasheet DS20005010H-page 18, Note 2
-    # Function added by @Paulskpt 
-    def _clr_pwr_failure_bit(self):
-        if self._is_pwr_failure():
-            # Only clear the pwr_failure_bit when that bit has been set
-            # Clearing it by writing a time to the MCP7940 timekeeping registers
-            # and so writing to the TIMEKEEPING WEEKDAY VALUE REGISTER too.
-            # This clears the PWRFAIL bit.
-            self.time = self._get_time(MCP7940.CONTROL_REGISTER)
-            if not my_debug:
-                print("PWRFAIL bit cleared")
-            return True
-        else:
-            if not my_debug:
-                print("There has not been a power failure.")
-        return False
-    """
+
     # Clear square wave output bit
     """ Function added by @Paulskpt """
     def _clr_SQWEN_bit(self):

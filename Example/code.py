@@ -61,12 +61,14 @@ import rtc
 import mcp7940
 import digitalio
 # Global flags
+
+my_debug = False  # Set to True if you need debug output to REPL
+
 # --- DISPLAY DRTIVER selection flag ----+
 use_sh1107 = True    #                   |
 # ---------------------------------------+
 use_wifi = True
 use_TAG = True
-my_debug = False  # Set to True if you need debug output to REPL
 use_ping = True
 
 time.sleep(5) # wait for mu-editor can show REPL from start
