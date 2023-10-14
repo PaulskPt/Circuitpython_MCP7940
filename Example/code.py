@@ -746,165 +746,6 @@ def clr_scrn():
         print()
 
 
-"""
- * @brief this function sets the WiFi.AuthMode. Then the function calls the function do_connect()
- * to establish a WiFi connection.
- *
- * @param None
- *
- * @return None
-"""
-def setup(state):
-    global pixels, my_brightness, mRTC, SRAM_dt, SYS_dt
-    TAG = tag_adj(state, "setup(): ")
-    # Create a colour wheel index int
-    color_index = 0
-
-    print(TAG+f"board: \'{state.board_id}\'")
-
-    if state.board_id == 'unexpectedmaker_feathers3':
-        try:
-            # Turn on the power to the NeoPixel
-            feathers3.set_ldo2_power(True)
-
-            if state.use_neopixel:
-                pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
-                #for i in range(len(pixels)):
-                #    pixels[i] = RED
-                neopixel.NeoPixel.brightness = state.neopixel_brightness
-                r,g,b = feathers3.rgb_color_wheel( state.BLK )
-                pixels[0] = ( r, g, b, state.neopixel_brightness)
-                pixels.write()
-        except ValueError:
-            pass
-
-    wifi.AuthMode.WPA2   # set only once
-
-    if is_NTP(state):
-        if not my_debug:
-            print(TAG+"We have NTP")
-    if is_INT_RTC():
-        if not my_debug:
-            print(TAG+"We have an internal RTC")
-        if state.SYS_RTC_is_set:
-            if my_debug:
-                print(TAG+"and the internal RTC is set from an NTP server")
-    if is_EXT_RTC:
-        if not my_debug:
-            print(TAG+"We have an external RTC")
-        if state.EXT_RTC_is_set:
-            if my_debug:
-                print(TAG+"and the external RTC is set from an NTP server")
-
-    s_mcp = "MCP7940"
-    s_pf1 = s_mcp+" Power failed"
-    s_en1 = s_mcp+" RTC battery "
-    s_en2 = s_en1+"is now enabled? "
-    s_rtc = "RTC datetime year "
-
-    MCP7940_is_started = False
-    
-    if my_debug:
-        print(TAG+f"Checking if {s_mcp} has been started.")
-    if not mcp.is_started():
-        if not my_debug:
-            print(TAG+f"{s_mcp} not started yet...")
-        mcp.start()
-        if mcp.is_started():
-            MCP7940_is_started = True
-            if not my_debug:
-                print(TAG+f"{s_mcp} now started")
-        else:
-            print(TAG+f"failed to start {s_mcp}")
-    else:
-        MCP7940_is_started = True
-        if my_debug:
-            print(TAG+f"{s_mcp}is running")
-            
-    if MCP7940_is_started:
-
-        if not my_debug:
-            print(TAG+f"Checking for {s_mcp} power failure.")
-        s_pf_yn = "Yes" if mcp.has_power_failed() else "No"
-        if my_debug:
-            print(TAG+f"{s_pf1}? {s_pf_yn}") # Check if the power failed bit is set
-        if s_pf_yn == "Yes":
-            mcp.clr_pwr_fail_bit()
-            if not mcp.has_power_failed():
-                if my_debug:
-                    print(TAG+"{s_pf1} bit cleared")
-
-            pwrud_dt = mcp.pwr_updn_dt(False)
-            if not my_debug:
-                print(TAG+f"{s_mcp} power down timestamp: {pwrud_dt}")
-            pwrud_dt = mcp.pwr_updn_dt(True)
-            if not my_debug:
-                print(TAG+f"{s_mcp} power up timestamp: {pwrud_dt}")
-    
-    if my_debug:
-        print(TAG+f"Checking if {s_en1} has been enabled.")
-    s_bbe_yn = "Yes" if mcp.is_battery_backup_enabled() else "No"
-    if s_bbe_yn == "No":
-        if my_debug:
-            print(TAG+f"{s_en1}is not enabled. Going to enable")
-        mcp.battery_backup_enable(True)  # Enable backup battery
-        # Check backup battery status again:
-        s_bbe_yn = "Yes" if mcp.is_battery_backup_enabled() else "No"
-        if my_debug:
-            print(TAG+f"{s_en2}{s_bbe_yn}")
-    else:
-        if my_debug:
-            print(TAG+f"{s_en2}{s_bbe_yn}")
-
-    if state.set_SYS_RTC :
-        if my_debug:
-            print(TAG+"Going to set internal (SYS) RTC")
-        set_INT_RTC(state)
-
-    if state.set_EXT_RTC:
-        set_EXT_RTC(state)
-
-    gc.collect()
-
-    if not my_debug:
-        print()
-
-    if my_debug:
-        if isinstance(state.SRAM_dt, tuple):
-            le = len(state.SRAM_dt)
-            if le > 0:
-                if state.SYS_dt is not None:
-                    print(TAG+s_mcp+" Internal RTC set to: {}, \ntype: {}".format(state.SYS_dt, type(state.SYS_dt)))
-                print(TAG+f"Contents of {s_mcp} External RTC\'s SRAM: {state.SRAM_dt}")
-                print(TAG+f"{s_mcp}_{s_rtc}read from SRAM = {state.SRAM_dt[state.yy]}")
-            else:
-                print(TAG+f"length of tuple state.SRAM_dt = {le}")
-        else:
-            print(TAG+f"Expected type tuple but got type: {type(state.SRAM_dt)}")
-
-    if not my_debug:
-        print(TAG+"start setting up MCP7940")
-
-    mcp._clr_SQWEN_bit()  # Clear the Square Wave Enable bit
-    mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
-    mcp._clr_ALMxIF_bit(1)     # Clear the interrupt of alarm1
-    mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
-    state.alarm1_int = False
-    mcp.alarm_enable(1, True)     # Enable alarm1
-    if not my_debug:
-        print(TAG+"...")
-    mcp._set_ALMPOL_bit(2) # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
-    mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm2
-    mcp._set_ALMxMSK_bits(2,1) # Set the alarm3 mask bits for a minutes match
-    state.alarm2_int = False
-    mcp.alarm_enable(2, False)     # Disable alarm2
-
-    state.mfp = rtc_mfp_int.value
-
-    if not my_debug:
-        print(TAG+"finished setting up MCP7940")
-    # prepare_alm_int(state)  # Prepare for alarm interrupt polling
-
 # Make preparations to enable alarm interrups from RTC shield
 # through the MFP (IO4) of the RTC shield.
 def prepare_alm_int(state):
@@ -1494,6 +1335,168 @@ def say_hello(header):
 
         # Sleep for 15ms so the colour cycle isn't too fast
         time.sleep(0.015)
+
+"""
+ * @brief this setup function, among various settings specific to the Unexpected Maker FeatherS3 board,
+ * sets the WiFi.AuthMode. Then the function calls the function do_connect()
+ * to establish a WiFi connection.
+ * It checks and sets various settings of the connected external Unexpected Makrer TinyPico RTC Shield (MCP7940)
+ * This function is called by main(). 
+ *
+ * @param: state class object
+ *
+ * @return None
+"""
+def setup(state):
+    global pixels, my_brightness, mRTC, SRAM_dt, SYS_dt
+    TAG = tag_adj(state, "setup(): ")
+    # Create a colour wheel index int
+    color_index = 0
+
+    print(TAG+f"board: \'{state.board_id}\'")
+
+    if state.board_id == 'unexpectedmaker_feathers3':
+        try:
+            # Turn on the power to the NeoPixel
+            feathers3.set_ldo2_power(True)
+
+            if state.use_neopixel:
+                pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
+                #for i in range(len(pixels)):
+                #    pixels[i] = RED
+                neopixel.NeoPixel.brightness = state.neopixel_brightness
+                r,g,b = feathers3.rgb_color_wheel( state.BLK )
+                pixels[0] = ( r, g, b, state.neopixel_brightness)
+                pixels.write()
+        except ValueError:
+            pass
+
+    wifi.AuthMode.WPA2   # set only once
+
+    if is_NTP(state):
+        if not my_debug:
+            print(TAG+"We have NTP")
+    if is_INT_RTC():
+        if not my_debug:
+            print(TAG+"We have an internal RTC")
+        if state.SYS_RTC_is_set:
+            if my_debug:
+                print(TAG+"and the internal RTC is set from an NTP server")
+    if is_EXT_RTC:
+        if not my_debug:
+            print(TAG+"We have an external RTC")
+        if state.EXT_RTC_is_set:
+            if my_debug:
+                print(TAG+"and the external RTC is set from an NTP server")
+
+    s_mcp = "MCP7940"
+    s_pf1 = s_mcp+" Power failed"
+    s_en1 = s_mcp+" RTC battery "
+    s_en2 = s_en1+"is now enabled? "
+    s_rtc = "RTC datetime year "
+
+    MCP7940_is_started = False
+    
+    if my_debug:
+        print(TAG+f"Checking if {s_mcp} has been started.")
+    if not mcp.is_started():
+        if not my_debug:
+            print(TAG+f"{s_mcp} not started yet...")
+        mcp.start()
+        if mcp.is_started():
+            MCP7940_is_started = True
+            if not my_debug:
+                print(TAG+f"{s_mcp} now started")
+        else:
+            print(TAG+f"failed to start {s_mcp}")
+    else:
+        MCP7940_is_started = True
+        if my_debug:
+            print(TAG+f"{s_mcp}is running")
+            
+    if MCP7940_is_started:
+
+        if not my_debug:
+            print(TAG+f"Checking for {s_mcp} power failure.")
+        s_pf_yn = "Yes" if mcp.has_power_failed() else "No"
+        if my_debug:
+            print(TAG+f"{s_pf1}? {s_pf_yn}") # Check if the power failed bit is set
+        if s_pf_yn == "Yes":
+            mcp.clr_pwr_fail_bit()
+            if not mcp.has_power_failed():
+                if my_debug:
+                    print(TAG+"{s_pf1} bit cleared")
+
+            pwrud_dt = mcp.pwr_updn_dt(False)
+            if not my_debug:
+                print(TAG+f"{s_mcp} power down timestamp: {pwrud_dt}")
+            pwrud_dt = mcp.pwr_updn_dt(True)
+            if not my_debug:
+                print(TAG+f"{s_mcp} power up timestamp: {pwrud_dt}")
+    
+    if my_debug:
+        print(TAG+f"Checking if {s_en1} has been enabled.")
+    s_bbe_yn = "Yes" if mcp.is_battery_backup_enabled() else "No"
+    if s_bbe_yn == "No":
+        if my_debug:
+            print(TAG+f"{s_en1}is not enabled. Going to enable")
+        mcp.battery_backup_enable(True)  # Enable backup battery
+        # Check backup battery status again:
+        s_bbe_yn = "Yes" if mcp.is_battery_backup_enabled() else "No"
+        if my_debug:
+            print(TAG+f"{s_en2}{s_bbe_yn}")
+    else:
+        if my_debug:
+            print(TAG+f"{s_en2}{s_bbe_yn}")
+
+    if state.set_SYS_RTC :
+        if my_debug:
+            print(TAG+"Going to set internal (SYS) RTC")
+        set_INT_RTC(state)
+
+    if state.set_EXT_RTC:
+        set_EXT_RTC(state)
+
+    gc.collect()
+
+    if not my_debug:
+        print()
+
+    if my_debug:
+        if isinstance(state.SRAM_dt, tuple):
+            le = len(state.SRAM_dt)
+            if le > 0:
+                if state.SYS_dt is not None:
+                    print(TAG+s_mcp+" Internal RTC set to: {}, \ntype: {}".format(state.SYS_dt, type(state.SYS_dt)))
+                print(TAG+f"Contents of {s_mcp} External RTC\'s SRAM: {state.SRAM_dt}")
+                print(TAG+f"{s_mcp}_{s_rtc}read from SRAM = {state.SRAM_dt[state.yy]}")
+            else:
+                print(TAG+f"length of tuple state.SRAM_dt = {le}")
+        else:
+            print(TAG+f"Expected type tuple but got type: {type(state.SRAM_dt)}")
+
+    if not my_debug:
+        print(TAG+"start setting up MCP7940")
+
+    mcp._clr_SQWEN_bit()  # Clear the Square Wave Enable bit
+    mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
+    mcp._clr_ALMxIF_bit(1)     # Clear the interrupt of alarm1
+    mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
+    state.alarm1_int = False
+    mcp.alarm_enable(1, True)     # Enable alarm1
+    if not my_debug:
+        print(TAG+"...")
+    mcp._set_ALMPOL_bit(2) # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
+    mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm2
+    mcp._set_ALMxMSK_bits(2,1) # Set the alarm3 mask bits for a minutes match
+    state.alarm2_int = False
+    mcp.alarm_enable(2, False)     # Disable alarm2
+
+    state.mfp = rtc_mfp_int.value
+
+    if not my_debug:
+        print(TAG+"finished setting up MCP7940")
+    # prepare_alm_int(state)  # Prepare for alarm interrupt polling
 
 
 """
