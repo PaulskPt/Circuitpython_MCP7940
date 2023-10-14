@@ -423,7 +423,6 @@ def int_rtc_is_PM(tm):
                 ret = True
     return ret
 
-# This function has been created
 # When a call to mcp.is_12hr() is positive,
 # the hours will be changed from 24 to 12 hour fomat:
 # AM/PM will be added to the datetime stamp
@@ -460,24 +459,12 @@ def add_12hr(t):
     if my_debug:
         print(TAG+f"_is_12hr: {is_12hr}, is_PM: {is_PM}")
 
-    t2 = (month, date, hours, \
-            minutes, seconds,  weekday)
+    t2 = (month, date, hours, minutes, seconds,  weekday)
     t3 = (year,) + t2 if num_registers == 7 else t2
 
     if my_debug:
         print(TAG+f"t2: {t2}")
-    # now = (2019, 7, 16, 15, 29, 14, 6, 167)  # Sunday 2019/7/16 3:29:14pm
-    # year, month, date, hours, minutes, seconds, weekday = t
-    # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
 
-    """
-    yrday = mcp.yearday(t3)
-    if my_debug:
-        print(f"yearday: {yrday}")
-        
-    isdst = -1
-    """
-    # t3 += (yrday, isdst, is_12hr, is_PM)  # add yearday and isdst to datetime stamp
     t3 += (is_12hr, is_PM)  # add yearday and isdst to datetime stamp
     
     if my_debug:
@@ -516,9 +503,7 @@ def upd_SRAM(state):
     
     if my_debug:
         print(TAG+f"tm2: {tm2}")
-        
-    # year, month, date, hours, minutes, seconds, weekday, yearday, isdst = tm
-    # year, month, date, hours, minutes, seconds, weekday, yearday, isdst, is_12hr, is_PM = tm2
+    
     year, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM = tm2
     
     tm3 = (year-2000, month, date, hours, minutes, seconds, weekday, is_12hr, is_PM)
@@ -725,7 +710,7 @@ def pr_dt(state, short, choice):
  * by checking if an IP address exists.
  * In the function do_connect() the global variable s_ip is set.
  *
- * @param None
+ * @param sate class object
  *
  * @return boolean. True if exists an ip address. False if not.
 """
@@ -795,7 +780,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
         state.alarm1_set = True
         # IMPORTANT NOTE:
         # ===============
-        # I experienced that if mcp.alarm1 (or mcp.alarm2) is called earlier setting of the ALMPOL bit is reset,
+        # I experienced that if mcp.alarm1 (or mcp.alarm2) is called earlier, the setting of the ALMPOL bit is reset,
         # that is why we set the ALMPOL bit again (below)
         # ===============
         mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
@@ -811,7 +796,7 @@ def set_alarm(state, alarm_nr = 1, mins_fm_now=10):
             print(TAG+f"check: alarm2 is set for: {t_ck}")
         state.alarm2 = t_ck
         state.alarm2_set = True
-        mcp._set_ALMPOL_bit(2) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
+        mcp._set_ALMPOL_bit(2) # Set ALMPOL bit of alarm1 (so the MFP follows the ALM1IF)
         mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm1
         mcp._set_ALMxMSK_bits(2,1) # Set the alarm1 mask bits for a minutes match
 
@@ -899,8 +884,6 @@ def ck_rtc_mfp_int(state):
         print(TAG+f"rtc interrupt line value: {s}")
     if v:
         state.mfp = v
-        #print(TAG+"RING RING RING we have an RTC interrupt !")
-        #alarm_blink(state)
 
 # Called from function: pol_alarm_int(state)
 def show_alm_match_type(msk=None):
@@ -1006,7 +989,6 @@ def show_alm_int_status(state):
                 ss1 = "PM"
             else:
                 ss1 = "AM"
-            #ss1 = "PM" if  mcp.is_PM() else "AM"
         else:
             ss1 = str(ss1)
             
@@ -1027,7 +1009,6 @@ def show_alm_int_status(state):
                 ss1 = "PM"
             else:
                 ss1 = "AM"
-            #ss2 = "PM" if  mcp.is_PM() else "AM"
         else:
             ss2 = str(ss2)
         match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(2)]
@@ -1055,7 +1036,6 @@ def show_alm_int_status(state):
             c_ss = "PM"
         else:
             c_ss = "AM"
-        #c_ss = "PM" if  mcp.is_PM() else "AM"
     else:
         c_ss = str(c_ss)
     
@@ -1097,7 +1077,6 @@ def show_alm_int_status(state):
     if ae2:
         print(s5) # idem
         print(s1)
-
 
 
 def alarm_blink(state):
@@ -1153,7 +1132,7 @@ def get_dt(state):
 """
  * @brief function performs a ping test with google.com
  *
- * @param None
+ * @param state class object
  *
  * @return None
 """
@@ -1200,7 +1179,7 @@ def ping_test(state):
  * If a WiFi connection has been established, function will:
  * sets the global variables: 'ip' and 's_ip' ( the latter used by function wifi_is_connected() )
  *
- * @param None
+ * @param state class object
  *
  * @return None
 """
@@ -1227,7 +1206,7 @@ def do_connect(state):
 """
  * @brief function print hostname to REPL
  *
- * @param None
+ * @param state class object
  *
  * @return None
 """
@@ -1238,7 +1217,7 @@ def hostname(state):
 """
  * @brief function prints mac address to REPL
  *
- * @param None
+ * @param state class object
  *
  * @return None
 """
@@ -1317,8 +1296,8 @@ def say_hello(header):
     color_index = 0
 
     # Turn on the power to the NeoPixel
-    #feathers3.set_pixel_power(True)
-   #feathers3.set_ldo2_power(True)  <<<<=== Is already set in setup()
+    # feathers3.set_pixel_power(True)
+    # feathers3.set_ldo2_power(True)  <<<<=== Is set in setup()
     # Rainbow colours on the NeoPixel
 
     while True:
@@ -1478,19 +1457,19 @@ def setup(state):
     if not my_debug:
         print(TAG+"start setting up MCP7940")
 
-    mcp._clr_SQWEN_bit()  # Clear the Square Wave Enable bit
-    mcp._set_ALMPOL_bit(1) # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
-    mcp._clr_ALMxIF_bit(1)     # Clear the interrupt of alarm1
-    mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
+    mcp._clr_SQWEN_bit()        # Clear the Square Wave Enable bit
+    mcp._set_ALMPOL_bit(1)      # Set ALMPOL bit of Alarm1 (so the MFP follows the ALM1IF)
+    mcp._clr_ALMxIF_bit(1)      # Clear the interrupt of alarm1
+    mcp._set_ALMxMSK_bits(1,1)  # Set the alarm1 mask bits for a minutes match
     state.alarm1_int = False
-    mcp.alarm_enable(1, True)     # Enable alarm1
+    mcp.alarm_enable(1, True)   # Enable alarm1
     if not my_debug:
         print(TAG+"...")
-    mcp._set_ALMPOL_bit(2) # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
-    mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm2
-    mcp._set_ALMxMSK_bits(2,1) # Set the alarm3 mask bits for a minutes match
+    mcp._set_ALMPOL_bit(2)      # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
+    mcp._clr_ALMxIF_bit(2)      # Clear the interrupt of alarm2
+    mcp._set_ALMxMSK_bits(2,1)  # Set the alarm3 mask bits for a minutes match
     state.alarm2_int = False
-    mcp.alarm_enable(2, False)     # Disable alarm2
+    mcp.alarm_enable(2, False)  # Disable alarm2
 
     state.mfp = rtc_mfp_int.value
 
@@ -1510,7 +1489,6 @@ def setup(state):
  * @return None
 """
 def main():
-    # state = State()
     TAG = tag_adj(state, "main(): ")
     if my_debug:
         print("Waiting another 5 seconds for mu-editor etc. getting ready")
