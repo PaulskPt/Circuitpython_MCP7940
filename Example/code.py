@@ -386,8 +386,8 @@ def set_EXT_RTC(state):
     
     # Check:
     if not my_debug:
-        ck = mcp.is_12hr()
-        print(TAG+f"ckeck: state of mcp.is_12hr(): {ck}")
+        ck = "12hr" if mcp.is_12hr() else "24hr"
+        print(TAG+f"MCP7950 datetime format: {ck}")
 
     if not my_debug:
         print(TAG+f"going to set {eRTC} for: {dt2}")
@@ -408,11 +408,9 @@ def set_EXT_RTC(state):
         if not my_debug:
             s_ampm = "PM" if mcp.is_PM() else "AM"
             print(TAG+eRTC+f"updated to: {ck_dt}", end='')
-            print("{:2s}".format( s_ampm ),end='\n')  # mcp.is_PM checks if the time format is 12 hr
+            print(" {:2s}".format(s_ampm),end='\n')  # mcp.is_PM checks if the time format is 12 hr
     else:
         state.SRAM_dt = ()
-    if not my_debug:
-        print()
 
 # Check internal RTC for AM or PM
 # if state.dt_str_usa is True
@@ -804,21 +802,8 @@ def setup(state):
     s_en2 = s_en1+"is now enabled? "
     s_rtc = "RTC datetime year "
 
-    pwrud_dt = mcp.pwr_updn_dt(False)
-    if not my_debug:
-        print(TAG+f"power down timestamp: {pwrud_dt}")
-    pwrud_dt = mcp.pwr_updn_dt(True)
-    if not my_debug:
-        print(TAG+f"power up timestamp: {pwrud_dt}")
-        print(TAG+f"Checking for {s_mcp} power failure.")
-    s_pf_yn = "Yes" if mcp.has_power_failed() else "No"
-    if my_debug:
-        print(TAG+f"{s_pf1}? {s_pf_yn}") # Check if the power failed bit is set
-    if s_pf_yn == "Yes":
-        mcp.clr_pwr_fail_bit()
-        if not mcp.has_power_failed():
-            if my_debug:
-                print(TAG+"{s_pf1} bit cleared")
+    MCP7940_is_started = False
+    
     if my_debug:
         print(TAG+f"Checking if {s_mcp} has been started.")
     if not mcp.is_started():
@@ -826,13 +811,36 @@ def setup(state):
             print(TAG+f"{s_mcp} not started yet...")
         mcp.start()
         if mcp.is_started():
+            MCP7940_is_started = True
             if not my_debug:
                 print(TAG+f"{s_mcp} now started")
         else:
             print(TAG+f"failed to start {s_mcp}")
     else:
+        MCP7940_is_started = True
         if my_debug:
             print(TAG+f"{s_mcp}is running")
+            
+    if MCP7940_is_started:
+
+        if not my_debug:
+            print(TAG+f"Checking for {s_mcp} power failure.")
+        s_pf_yn = "Yes" if mcp.has_power_failed() else "No"
+        if my_debug:
+            print(TAG+f"{s_pf1}? {s_pf_yn}") # Check if the power failed bit is set
+        if s_pf_yn == "Yes":
+            mcp.clr_pwr_fail_bit()
+            if not mcp.has_power_failed():
+                if my_debug:
+                    print(TAG+"{s_pf1} bit cleared")
+
+            pwrud_dt = mcp.pwr_updn_dt(False)
+            if not my_debug:
+                print(TAG+f"{s_mcp} power down timestamp: {pwrud_dt}")
+            pwrud_dt = mcp.pwr_updn_dt(True)
+            if not my_debug:
+                print(TAG+f"{s_mcp} power up timestamp: {pwrud_dt}")
+    
     if my_debug:
         print(TAG+f"Checking if {s_en1} has been enabled.")
     s_bbe_yn = "Yes" if mcp.is_battery_backup_enabled() else "No"
@@ -883,7 +891,8 @@ def setup(state):
     mcp._set_ALMxMSK_bits(1,1) # Set the alarm1 mask bits for a minutes match
     state.alarm1_int = False
     mcp.alarm_enable(1, True)     # Enable alarm1
-
+    if not my_debug:
+        print(TAG+"...")
     mcp._set_ALMPOL_bit(2) # ALMPOL bit of Alarm2 (so the MFP follows the ALM2IF)
     mcp._clr_ALMxIF_bit(2)     # Clear the interrupt of alarm2
     mcp._set_ALMxMSK_bits(2,1) # Set the alarm3 mask bits for a minutes match
