@@ -83,7 +83,7 @@ if my_debug:
 
 import adafruit_ntp
 pool = socketpool.SocketPool(wifi.radio)
-ntp = adafruit_ntp.NTP(pool, tz_offset=1)
+ntp = adafruit_ntp.NTP(pool, tz_offset=0)
 
 pool = None
 
@@ -94,6 +94,7 @@ class State:
         self.board_id = None
         self.lStart = True
         self.loop_nr = -1
+        self.ssid = None
         self.tag_le_max = 24  # see tag_adj()
         self.use_clr_SRAM = False
         self.set_SYS_RTC = True
@@ -275,6 +276,21 @@ mcp = mcp7940.MCP7940(i2c)
 # Adjust the values of the state.dt_dict to the actual date and time
 # Don't forget to enable the state.set_EXT_RTC flag (above)
 
+# Set the interrupt line coming from the UM RTC Shield, pin 4 (MFP)
+# According to the RTC Shield schematic the MFP pin is pulled up
+# through a 10kOhm resistor, connected to VCC (3.3V).
+def interrupt_handler(state):  # (pin):
+    TAG = tag_adj(state, "interrupt_handler(): ")
+    if state.mfp:  # We have an interrupt!
+        print(TAG+"RING RING RING we have an interrupt from the RTC shield!")
+        alarm_blink(state)
+        clr_alarm(state, 1)
+        mcp._clr_ALMxIF_bit(1) # Clear the interrupt
+        state.mfp = False
+        raise KeyboardInterrupt
+
+# rtc_mfp_int.irq(handler=interrupt_handler, trigger=Pin.IRQ_RISING)
+
 def is_NTP(state):
     TAG = tag_adj(state, "is_NTP(): ")
     ret = False
@@ -315,6 +331,8 @@ def set_INT_RTC(state):
     if internal_RTC:
         try:
             dt = ntp.datetime
+            if not my_debug:
+                print(TAG+f"(ntp.datetime, dt: {dt}")
             mRTC.datetime = dt
         except OSError as e:
             print(TAG+f"Error while trying to set internal RTC from NTP datetime: {e}")
@@ -389,12 +407,12 @@ def set_EXT_RTC(state):
     # IMPORTANT: before setting the EXTernal RTC, set the 12/24 hour format !
     # Set 12/24 hour time format
     if not my_debug:
-        print(TAG+f"setting MCP7940.is_12hr to: {state.dt_str_usa}")
+        print(TAG+f"setting MCP7940._is_12hr_fmt to: {state.dt_str_usa}")
     mcp.set_12hr(state.dt_str_usa)
     
     # Check:
     if not my_debug:
-        ck = "12hr" if mcp.is_12hr() else "24hr"
+        ck = "12hr" if mcp._is_12hr else "24hr"
         print(TAG+f"MCP7950 datetime format: {ck}")
 
     if not my_debug:
@@ -414,7 +432,7 @@ def set_EXT_RTC(state):
         state.EXT_RTC_is_set = True
         state.SRAM_dt = ck_dt
         if not my_debug:
-            s_ampm = "PM" if mcp.is_PM() else "AM"
+            s_ampm = get_ampm(ck_dt[state.hh]) # was: s_ampm = "PM" if mcp._is_PM() else "AM"
             print(TAG+eRTC+f"updated to: {ck_dt}", end='')
             print(" {:2s}".format(s_ampm),end='\n')  # mcp.is_PM checks if the time format is 12 hr
     else:
@@ -431,7 +449,7 @@ def int_rtc_is_PM(tm):
                 ret = True
     return ret
 
-# When a call to mcp.is_12hr() is positive,
+# When a call to mcp._is_12hr is positive,
 # the hours will be changed from 24 to 12 hour fomat:
 # AM/PM will be added to the datetime stamp
 def add_12hr(t):
@@ -971,6 +989,14 @@ def show_alarm_output_truth_table(state, alarm_nr=None):
     print("See: MCP7940N datasheet DS20005010H-page 27")
     print()
 
+def get_ampm(hh):
+    ret = " ?"
+    if isinstance(hh, int):
+        if mcp._is_12hr: # was: if state.dt_str_usa:
+            ret = "PM" if mcp._is_PM(hh) == 1 else "AM"
+        else:
+            ret = str(hh)
+    return ret
 
 def show_alm_int_status(state):
     TAG = tag_adj(state, "show_alm_int_status(): ")
@@ -982,7 +1008,8 @@ def show_alm_int_status(state):
     
     ae1=mcp.alarm_is_enabled(1)
     ae2=mcp.alarm_is_enabled(2)
-
+    is_12hr = mcp._is_12hr
+    
     if ae1:
         alarm1en = "Yes" if ae1 else "No  "
         ts1 = state.alarm1[:6]  # slice off yearday and isdst
@@ -991,14 +1018,11 @@ def show_alm_int_status(state):
             
         mo1, dd1, hh1, mi1, ss1, wd1 = ts1
             
-        if state.dt_str_usa:
+        ss1 = get_ampm(hh1)
+
+        if is_12hr:
             if hh1 > 12:
                 hh1 -= 12
-                ss1 = "PM"
-            else:
-                ss1 = "AM"
-        else:
-            ss1 = str(ss1)
             
         match1 = mcp._match_lst[mcp._read_ALMxMSK_bits(1)]
         if match1 == "mm" and not state.dt_str_usa:
@@ -1011,14 +1035,12 @@ def show_alm_int_status(state):
             
         mo2, dd2, hh2, mi2, ss2, wd2 = ts2
         
-        if state.dt_str_usa:
-            if hh1 > 12:
-                hh1 -= 12
-                ss1 = "PM"
-            else:
-                ss1 = "AM"
-        else:
-            ss2 = str(ss2)
+        ss2 = get_ampm(hh2)
+
+        if is_12hr:
+            if hh2 > 12:
+                hh2 -= 12
+        
         match2 = mcp._match_lst[mcp._read_ALMxMSK_bits(2)]
         if match2 == "mm" and not state.dt_str_usa:
             ss2 = None
@@ -1038,16 +1060,13 @@ def show_alm_int_status(state):
     elif num_registers == 11:
         _, c_mo, c_dd, c_hh, c_mi, c_ss, c_wd, _, _, _, _ = tm_current  # Discard year, yearday and isdst, is_12hr, is_PM
     
-    if state.dt_str_usa:
-        if c_hh > 12:
-            c_hh -= 12
-            c_ss = "PM"
-        else:
-            c_ss = "AM"
-    else:
-        c_ss = str(c_ss)
+    c_ss = get_ampm(c_hh)
+
+    if is_12hr:
+            if c_hh > 12:
+                c_hh -= 12
     
-    v = "Yes " if rtc_mfp_int.value else "No  "
+    v = "Yes " if state.mfp else "No  "
 
     s3 = "|      {:s}      |    {:s}     |  {:2d}   |  {:2d} |  {:2d}  |   {:2d}   |   {:2s}   |   {:s}   | {:s}                   | {:18s} |". \
         format("X","X", c_mo, c_dd, c_hh, c_mi, c_ss, mcp.DOW[c_wd][:3],"X","CURRENT DATETIME")
@@ -1197,7 +1216,8 @@ def do_connect(state):
     # Get env variables from file settings.toml
     ssid = os.getenv("CIRCUITPY_WIFI_SSID")
     pw = os.getenv("CIRCUITPY_WIFI_PASSWORD")
-
+    state.ssid = ssid
+    
     try:
         wifi.radio.connect(ssid=ssid, password=pw)
     except ConnectionError as e:
@@ -1335,15 +1355,10 @@ def say_hello(header):
  * @return None
 """
 def setup(state):
-    global pixels, mRTC, SRAM_dt, SYS_dt, ssid, pw
+    global pixels, mRTC, SRAM_dt, SYS_dt
     TAG = tag_adj(state, "setup(): ")
     # Create a colour wheel index int
     color_index = 0
-    
-    # Get env variables from file settings.toml
-    ssid = os.getenv("CIRCUITPY_WIFI_SSID")
-    pw = os.getenv("CIRCUITPY_WIFI_PASSWORD")
-    print(f"ssid= {ssid}")
 
     print(TAG+f"board: \'{state.board_id}\'")
 
@@ -1362,9 +1377,14 @@ def setup(state):
                 pixels.write()
         except ValueError:
             pass    
-    
+        
     wifi.AuthMode.WPA2   # set only once
-
+    
+    do_connect(state)
+    
+    if wifi_is_connected(state):
+        print(TAG+f"WiFi connected to: {state.ssid}. IP: {state.s__ip}")
+    
     if is_NTP(state):
         if not my_debug:
             print(TAG+"We have NTP")
@@ -1581,13 +1601,14 @@ def main():
                     upd_SRAM(state)
                     if sram_demo_cnt <  sram_demo_max_cnt+1:
                         sram_demo_cnt += 1
-
+                # ------------------------------------------------------------------------------------------------
                 if alarm_start:
-                    clr_alarm(state, 1)
+                    alarm_nr = 1
+                    clr_alarm(state, alarm_nr)
                     state.alarm1_set = False
-                    mcp._set_ALMxMSK_bits(1, 1)  # Set Alarm1 Mask bits to have Alarm Minutes match
+                    mcp._set_ALMxMSK_bits(alarm_nr, 1)  # Set Alarm1 Mask bits to have Alarm Minutes match
                     if not state.alarm1_set:
-                        set_alarm(state, 1, 2) # Set alarm1 for time now + 2 minutes
+                        set_alarm(state, alarm_nr, 2) # Set alarm1 for time now + 2 minutes
                         state.alarm1_set = True
                         alarm_start = False
                 #pol_alarm_int(state)  # Check alarm interrupt
@@ -1597,12 +1618,10 @@ def main():
                     show_alarm_output_truth_table(state, 1) # Show alarm output truth table for alarm1
                     show_alm_int_status(state)
                 pol_alarm_int(state)  # Check alarm interrupt
-                if state.mfp:  # We have an interrupt!
-                    print(TAG+"RING RING RING we have an interrupt from the RTC shield!")
-                    alarm_blink(state)
-                    mcp._clr_ALMxIF_bit(1) # Clear the interrupt
-                    state.mfp = False
-                    raise KeyboardInterrupt
+                if state.alarm1_int:
+                    interrupt_handler(state)
+                # pol_alarm_int(state)  # Check alarm interrupt
+                # ------------------------------------------------------------------------------------------------
         except KeyboardInterrupt:
             wifi.radio.stop_station()
             r,g,b = pros3.rgb_color_wheel( state.BLK )

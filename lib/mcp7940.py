@@ -72,7 +72,7 @@ class MCP7940:
             ntptime.settime() # Set system time from NTP
             mcp.time = utime.localtime() # Set the MCP7940 with the system time
     """
-
+    CLS_NAME = "MCP7940"
     ADDRESS = const(0x6F)       # '11001111'
     CONTROL_BYTE = 0xde # '1101 1110'
     
@@ -160,10 +160,16 @@ class MCP7940:
     def __init__(self, i2c, status=True, battery_enabled=True):
         self._i2c = i2c
         # lines added by @PaulskPt
-        # self.is_dst = 0
         self._match_lst = ["ss", "mm", "hh", "dow", "dd", "res", "res", "all"]
-        self._is_12hr = -1  # Set by calling script. Default -1 to indicate it is not yet set
+        self._match_lst_long = ["second", "minute", "hour", "weekday", "date", "reserved", "reserved", "all"]
+        self._is_12hr_fmt = -1 # Set by calling script. Default -1 to indicate it is not yet set
         self.time_is_set = False
+        self.last_time_set = ()
+        self.sbf = "calling self._set_bit() failed"
+        self.rbf = "calling self._read_bit() failed"
+        self.gtf = "calling self._mcpget_time() failed"
+        self._status = status
+        self._battery_enabled = battery_enabled
     
     # See datasheet: DS20005010H-page 18
     def has_power_failed(self):
@@ -174,35 +180,7 @@ class MCP7940:
     
     def clr_pwr_fail_bit(self):
         self._set_bit(MCP7940.PWR_FAIL_REG, MCP7940.PWRFAIL_BIT, 0)
-        
-    """
-    # See datasheet: DS20005010H-page 18
-    # Function added by @Paulskpt 
-    def _is_pwr_failure(self):
-        reg = MCP7940.RTCWKDAY
-        bit = MCP7940.PWRFAIL_BIT
-        ret = self._read_bit(reg, bit)
-        if my_debug:
-            print(f"_is_pwr_failure(): state power failure register: {ret}")
-        return ret
     
-    # See datasheet DS20005010H-page 18, Note 2
-    # Function added by @Paulskpt 
-    def _clr_pwr_failure_bit(self):
-        if self._is_pwr_failure():
-            # Only clear the pwr_failure_bit when that bit has been set
-            # Clearing it by writing a time to the MCP7940 timekeeping registers
-            # and so writing to the TIMEKEEPING WEEKDAY VALUE REGISTER too.
-            # This clears the PWRFAIL bit.
-            self.time = self._get_time(MCP7940.CONTROL_REGISTER)
-            if not my_debug:
-                print("PWRFAIL bit cleared")
-            return True
-        else:
-            if not my_debug:
-                print("There has not been a power failure.")
-        return False
-    """
     
     def start(self):
         ads = 0x3
@@ -339,7 +317,6 @@ class MCP7940:
         return self._get_time()
 
     # Added calls to self.stop() and self.start()
-    """ Function modified by @PaulskPt """
     @time.setter
     def time(self, t):
         """
@@ -357,7 +334,7 @@ class MCP7940:
         if my_debug:
             print(TAG+f"time_reg:{time_reg}")
         
-        if self.is_12hr():
+        if self._is_12hr:
             # Set AMPM
             if hours >= 12:
                 self.set_PM(True)
@@ -429,43 +406,46 @@ class MCP7940:
             self.set_12hr(self._is_12hr)
         # --------------------------------------------------------------------------------------
     
-    # Set the 12hr bit and set self._is_12hr flag if not yet set    
+    # Set the 12hr bit and set self._is_12hr_fmt flag if not yet set    
     # See MCP7940 Datasheet DS20005010H-page 17
-    """ Function added by @Paulskpt """
+    # Return 0 if able to set self._is_12hr_fmt
+    # We're not going to set the 12hr fmt bit in the MCP7940 hour register
+    # because it appeared this did not work. Better set a flag within this class   
     def set_12hr(self, _12hr=None):
+        TAG = MCP7940.CLS_NAME+".set_12hr(): "
+        ret = 0
         if _12hr is None:
-            return
+            return ret
         if my_debug:
-            print(f"MCOP7940.set_12hr(): type(_12hr): {type(_12hr)}")
+            print(TAG+f"param _12hr: {_12hr}, type(_12hr): {type(_12hr)}")
         if not isinstance(_12hr, bool):
-            return
+            return ret
+        bit = 6
+        reg = MCP7940.RTCHOUR
         value = 1 if _12hr else 0
-        bit = 6
-        reg = MCP7940.RTCHOUR
-        if my_debug:
-            print(f"MCOP7940.set_12hr(): setting reg: {hex(reg)}, bit {bit}, _12hr {_12hr}")
-        self._set_bit(reg, bit, value)
-        self._is_12hr = value
-    
-    # See MCP7940 Datasheet DS20005010H-page 17
-    """ Function added by @Paulskpt """
-    def is_12hr(self):
-        bit = 6
-        reg = MCP7940.RTCHOUR
-        ret = self._read_bit(reg, bit)
-        if my_debug:
-            print(f"MCOP7940.is_12hr(): {ret}")
+        if self._is_12hr_fmt == -1:  # If not set yet, set it to remember
+             self._is_12hr_fmt = value # Remember the settingset_PM
+             ret = 1
+        #if my_debug:
+        #    print(f"MCOP7940.set_12hr(): setting reg: {hex(reg)}, bit {bit}, _12hr {value}")
+        #ret = self._set_bit(reg, bit, value)
+        #if ret == -1:
+        #    print(TAG+self.sbf)
         return ret
     
+    # See MCP7940 Datasheet DS20005010H-page 17
+    @property
+    def _is_12hr(self):
+        return self._is_12hr_fmt
+    
     # Set the AMPM bit if the 12hr bit is set
-    """ Function added by @Paulskpt """
     def set_PM(self, isPM=None):
         if isPM is None:
             return
         if not isinstance(isPM, bool):
             return
         
-        if self.is_12hr():
+        if self._is_12hr:
             bit = 5
             reg = MCP7940.RTCHOUR
             value = 1 if isPM else 0
@@ -475,21 +455,21 @@ class MCP7940:
     
     # Return the AMPM bit is the 12hr bit is set
     # See MCP7940 Datasheet DS20005010H-page 17
-    """ Function added by @Paulskpt """
-    def is_PM(self):
-        TAG = "MCOP7940.is_PM():      "
-        ret = None
-        if self.is_12hr():
-            bit = 5
-            reg = MCP7940.RTCHOUR
-            ret = self._read_bit(reg, bit)
+    def _is_PM(self, hour):
+        TAG = MCP7940.CLS_NAME+"._is_PM(): "
+        ret = 0
+        if hour is None:
+            return ret
+        if hour >= 0 and hour < 24:
+            is_12hr = self._is_12hr
             if my_debug:
-                print(TAG+f"return ret: {ret}")
+                print(TAG+f"self._is_12hr: {is_12hr}")
+            if is_12hr:
+                return 1 if hour >= 12 else 0
         return ret
     
     # Enable alarm x
     # See datasheet  DS20005010H-page 26
-    """ Function added by @Paulskpt """
     def alarm_enable(self, alarm_nr= None, onoff = False):
         if alarm_nr is None:
             return
@@ -510,7 +490,6 @@ class MCP7940:
         self._set_bit(reg, bit, value)
     
     # Check if alarm x is enabled
-    """ Function added by @Paulskpt """
     def alarm_is_enabled(self, alarm_nr=None):
         if alarm_nr is None:
             return
@@ -603,7 +582,6 @@ class MCP7940:
         return False
     
     # Return the weekday as an integeradded by @Paulskpt """
-    """ Function added by @Paulskpt """
     def weekday_N(self):
         TAG = "weekday_N(): "
         dt = self._get_time()
@@ -616,12 +594,10 @@ class MCP7940:
         return weekday
     
     # Return the weekday as a string
-    """ Function added by @Paulskpt """
     def weekday_S(self):
         return MCP7940.DOW[self.weekday_N()]
     
     # Calculate the yearday
-    """ Function added by @Paulskpt """
     def yearday(self, dt0=None):
         if my_debug:
             print(f"yearday(): param dt0: {dt0}")
@@ -649,17 +625,14 @@ class MCP7940:
         return ndays
 
     # Clear square wave output bit
-    """ Function added by @Paulskpt """
     def _clr_SQWEN_bit(self):
         self._set_bit(0x07, MCP7940.SQWEN_BIT, 0)
     
     # Read state of the square wave output bit
-    """ Function added by @Paulskpt """ 
     def _read_SQWEN_bit(self):
         return self._read_bit(0x07, MCP7940.SQWEN_BIT)
         
-    # Set the alarm pol bit for alarm x
-    """ Function added by @Paulskpt """ 
+    # Set the alarm pol bit for alarm x 
     def _set_ALMPOL_bit(self, alarm_nr=None):
         if alarm_nr is None:
             return
@@ -674,8 +647,7 @@ class MCP7940:
             ck_bit = self._read_ALMPOL_bit(alarm_nr)
             print("MCP7940._set_ALMPOL_bit() for alarm{:d}: check: b\'{:b}\'".format(alarm_nr, ck_bit))
     
-    # Clear the alarm pol bit for alarm x
-    """ Function added by @Paulskpt """      
+    # Clear the alarm pol bit for alarm x    
     def _clr_ALMPOL_bit(self, alarm_nr=None):
         if alarm_nr is None:
             return
@@ -690,7 +662,6 @@ class MCP7940:
         self._set_bit(ads, MCP7940.ALMPOL_BIT, 0)
 
     # read the alarm pol bit for alarm x
-    """ Function added by @Paulskpt """
     def _read_ALMPOL_bit(self, alarm_nr=None):
         if alarm_nr is None:
             return
@@ -706,7 +677,6 @@ class MCP7940:
         return ret
     
     # read the alarm interrupt flag bit for alarm x
-    """ Function added by @Paulskpt """
     def _read_ALMxIF_bit(self, alarm_nr=None):
         if alarm_nr is None:
             return
@@ -721,7 +691,6 @@ class MCP7940:
     # See MCP7940 datasheet  DS20005010H-page 23, note 2
     # Writing to the ALMxWKDAY register will always clear the ALMxIF bit.
     # This is what we do in _clr_ALMxIF_bit() below:
-    """ Function added by @Paulskpt """
     def _clr_ALMxIF_bit(self, alarm_nr=None):
         TAG = "MCP7940._clr_ALMxIF_bit():  "
         if alarm_nr is None:
@@ -793,7 +762,6 @@ class MCP7940:
             #pass
 
     # Read the alarms mask bits for alarm x
-    """ Function added by @Paulskpt """
     def _read_ALMxMSK_bits(self, alarm_nr= None):
         TAG= "MCP7940._read_ALMxMSK_bits(): "
         if alarm_nr is None:
@@ -827,8 +795,7 @@ class MCP7940:
             print(TAG+f"ret: {hex(ret)}, type of match: {self._match_lst[ret]}")
         return ret
     
-    # Set the alarm mask (= alarm match) bits for alarm x
-    """ Function added by @Paulskpt """  
+    # Set the alarm mask (= alarm match) bits for alarm x 
     def _set_ALMxMSK_bits(self, alarm_nr= None, match_type=None):
         TAG = "MCP7940._set_ALMxMSK_bits(): "
         if alarm_nr is None:
@@ -837,28 +804,6 @@ class MCP7940:
             return
         if match_type is None:
             return
-        #
-        # match type
-        # b7 b6 b5 b4 b3 b2 b1 b0
-        #  x  0  0  1  x  x  x  x = minute
-        # 
-        # b'001'  match type
-        # b'001'
-        # ----- &
-        # b'001'  result
-        #
-        # 
-        # b'001'  match type
-        # b'010'
-        # ----- &
-        # b'000'  result
-        #
-        # current2
-        # b'001'  match type
-        # b'100'
-        # ----- &
-        # b'000'  result
-        #
         if alarm_nr == 1:
             ads = 0x0D
         elif alarm_nr == 2:
@@ -935,7 +880,6 @@ class MCP7940:
     # c) alarm1
     # d) alarm2
     # e) power fail
-    """ Function modified by @Paulskpt """
     def _get_time(self, start_reg = 0x00):
         TAG = "MCP7940._get_time():   "
         num_registers = 7 if start_reg == 0x00 else 6
@@ -1008,15 +952,27 @@ class MCP7940:
         if my_debug:
             print(TAG+f"t: {t}")
             
+        hh = t[MCP7940.RTCHOUR]
+        if my_debug:
+            print(TAG+f"self._is_12hr: {self._is_12hr}")
+            print(TAG+"hh: {:2d}, b\'{:08b}\'".format(hh, hh))
+        if self._is_12hr:
+            hh &= 0x1F  # mask 12/24 bit and mask AM/PM bit
+            #if hh >= 12:
+            #    hh -= 12
+            
         # Reorder
         t2 = (t[MCP7940.RTCMTH], t[MCP7940.RTCDATE], t[MCP7940.RTCHOUR], \
               t[MCP7940.RTCMIN], t[MCP7940.RTCSEC],  t[MCP7940.RTCWKDAY])
         t3 = (t[MCP7940.RTCYEAR] + 2000,) + t2 if num_registers == 7 else t2
   
         if my_debug:
-            print(TAG+f"t2: {t2}")
-        # now = (2019, 7, 16, 15, 29, 14, 6, 167)  # Sunday 2019/7/16 3:29:14pm
-        # year, month, date, hours, minutes, seconds, weekday = t
+            print(TAG+"hh (bits 7-5 masked): {:2d}, b\'{:08b}\'".format(hh, hh))
+            print(TAG+f"length t: {t}")
+        t2 = (t[MCP7940.RTCMTH], t[MCP7940.RTCDATE], hh, t[MCP7940.RTCMIN], t[MCP7940.RTCSEC], t[MCP7940.RTCWKDAY])
+        t3 = (t[MCP7940.RTCYEAR] + 2000,) + t2 if num_registers == 7 else t2
+        # now = (2019, 7, 16, 15, 29, 14, 6, 167)  # Sunday 2019/7/16 3:29:14pm (yearday=167)
+        # year, month, date, hours, minutes, seconds, weekday, yearday = t
         # time_reg = [seconds, minutes, hours, weekday, date, month, year % 100]
         
         if my_debug:
@@ -1024,7 +980,6 @@ class MCP7940:
         return t3
     
     # Read the datetime stamps of the pwr down / pwr up events
-    """ Function added by @Paulskpt """
     def pwr_updn_dt(self, pwr_updn=True): # power up is default
         TAG="get_pwr_up_dt():         "
         reg_buf = bytearray()
@@ -1089,7 +1044,6 @@ class MCP7940:
         return t2
 
     # Clear the 64 bytes of SRAM space
-    """ Function added by @Paulskpt """
     def clr_SRAM(self):
         TAG = "clr_SRAM(): "
         out_buf = bytearray()
@@ -1109,7 +1063,6 @@ class MCP7940:
             self._i2c.unlock()
 
     # Print contents of the 64 bytes of SRAM space
-    """ Function added by @Paulskpt """
     def show_SRAM(self):
         TAG = "show_SRAM(): "
         reg_buf = bytearray()
@@ -1138,8 +1091,7 @@ class MCP7940:
         print()
         
         
-    # Write datetime stamp to SRAM
-    """ Function added by @Paulskpt """  
+    # Write datetime stamp to SRAM 
     def write_to_SRAM(self, dt):
         TAG="MCP7940.write_to_SRAM():    "
         le = len(dt)
@@ -1203,7 +1155,6 @@ class MCP7940:
             #pass
 
     # Read datetime stamp from SRAM
-    """ Function added by @Paulskpt """
     def read_fm_SRAM(self):
         TAG = "MCP7940.read_fm_SRAM():     "
         dt = bytearray(0x40) #  read all the SRAM memory. was: (num_regs)
