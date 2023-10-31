@@ -539,12 +539,13 @@ def is_dst(state, tm=None):
     
     if tm is None:
         tm = time.localtime()
+        if not my_debug:
+            print(TAG+f"time.localtime(): {tm}")
     
     dst_org = dst_offset # get original value
     
     if not tm[state.tm_year] in dst.keys():
         print("year: {} not in dst dictionary ({}).\nUpdate the dictionary! Exiting...".format(tm[state.tm_year], dst.keys()))
-        raise SystemExit
     else:
         dst_start_end = dst[tm[state.tm_year]]
     if my_debug:
@@ -1740,7 +1741,7 @@ def say_hello(header):
  * @return None
 """
 def setup(state):
-    global pixels, config, dst_offset, ntp, pool
+    global pixels, config, dst_offset, ntp, pool, mRTC
     TAG = tag_adj(state, "setup(): ")
     s_mcp = "MCP7940"
     s_pf1 = s_mcp+" Power failed"
@@ -1757,14 +1758,6 @@ def setup(state):
     state.dst = dst_offset # copy the global value into the state class attribute
     
     read_fm_config(state)
-    
-    my_countries_dst = state.UTC_OFFSET if is_dst(state) else 0
-    if not my_debug:
-        print(TAG+f"my_countries_dst: {my_countries_dst}")
-    ntp = adafruit_ntp.NTP(pool, tz_offset = my_countries_dst)  # tz_offset e.g.: -4, 0, 1, 12
-    pool = None
-    if ntp and my_debug:
-        print(TAG+f"ntp object {type(ntp)} created")
 
     wifi.AuthMode.WPA2   # set only once
     do_connect(state)
@@ -1796,9 +1789,26 @@ def setup(state):
         ck = "12hr" if mcp._is_12hr else "24hr"
         print(TAG+f"MCP7950 datetime format: {ck}")
     
+    # We need an NTP datetime stamp first
+    # to set the internal RTC
+    ntp = adafruit_ntp.NTP(pool, tz_offset = 0)  # tz_offset e.g.: -4, 0, 1, 12
+    mRTC.datetime = ntp.datetime 
+    
+    if ntp and my_debug:
+        print(TAG+f"ntp object {type(ntp)} created")
     if wifi_is_connected(state):
+        
+        # Now adjust the ntp object for local timezone offset
+        my_countries_dst = state.UTC_OFFSET if is_dst(state) else 0
+        if not my_debug:
+            print(TAG+f"my_countries_dst: {my_countries_dst}")
+        ntp = None
+        ntp = adafruit_ntp.NTP(pool, tz_offset = my_countries_dst)  # tz_offset e.g.: -4, 0, 1, 12
+        
+        
         set_time(state)  # call at start
         gc.collect()
+        
 
     if state.dt_str_usa == True:
         print(TAG+"setting MCP7940 for 12hr time format")
@@ -1904,6 +1914,7 @@ def setup(state):
 
     #if state.set_EXT_RTC:
     #    set_EXT_RTC(state)
+    pool = None
 
 
 
