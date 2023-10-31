@@ -533,9 +533,12 @@ def can_update_fm_NTP(state):
             time.sleep(2)  # we have to wait 15 seconds
     return ret
 
-def is_dst(state, tm):
+def is_dst(state, tm=None):
     global dst_offset, ntp
     TAG= tag_adj(state, "is_dst(): ")
+    
+    if tm is None:
+        tm = time.localtime()
     
     dst_org = dst_offset # get original value
     
@@ -591,7 +594,7 @@ def is_dst(state, tm):
         # print(TAG+f"state.dst: {state.dst}")
         s = 'Yes' if state.dst == 1 else 'No'
         print(TAG+f"Are we in daylight saving time for country: \'{state.COUNTRY}\', state: \'{state.STATE}\' ? {s}")
-
+    return state.dst
 
 def set_time(state):
     global config
@@ -1755,7 +1758,10 @@ def setup(state):
     
     read_fm_config(state)
     
-    ntp = adafruit_ntp.NTP(pool, tz_offset = state.UTC_OFFSET)  # tz_offset e.g.: -4, 0, 1, 12
+    my_countries_dst = state.UTC_OFFSET if is_dst(state) else 0
+    if not my_debug:
+        print(TAG+f"my_countries_dst: {my_countries_dst}")
+    ntp = adafruit_ntp.NTP(pool, tz_offset = my_countries_dst)  # tz_offset e.g.: -4, 0, 1, 12
     pool = None
     if ntp and my_debug:
         print(TAG+f"ntp object {type(ntp)} created")
