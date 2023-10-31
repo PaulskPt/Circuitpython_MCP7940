@@ -7,3 +7,6 @@ In the Example FeatherS3, the MFP line, pin 4 on the UM RTC Shield is connected 
 In the Example ProS3, the MFP line, pin 4 on the UM RTC Shield is connected to pin IO15 of the UM ProS3.
 When a 'match' interrupt occurs, the NEOPIXEL led will flash alternatively red and blue for some cycles. The sketch will issue a KeyboardInterrupt after receiving the RTC Interrupt.
 
+## Update 2023-10-31:
+In Example 2 added a file `dst.py` which contains the dst start and end `EPOCH values for the years 2022 - 2031`. In the current example the file `dst.py` contains the dst values for `timezone 'Europe/Portugal'`.
+You can change the values for your timezone. See: `https://www.epochconverter.com/`
