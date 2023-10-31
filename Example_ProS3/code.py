@@ -60,6 +60,7 @@ import rtc
 import mcp7940
 import digitalio
 import json
+from dst import dst
 # Global flags
 
 my_debug = False  # Set to True if you need debug output to REPL
@@ -83,11 +84,11 @@ mRTC = rtc.RTC()  # create internal RTC object
 if my_debug:
     print(f"global mRTC: {mRTC}")
 
+dst_offset = 0  # PT wintertime
+
 import adafruit_ntp
 pool = socketpool.SocketPool(wifi.radio)
-ntp = adafruit_ntp.NTP(pool, tz_offset=0)
-
-pool = None
+ntp = None  # See setup
 
 def save_config():
     """function to save the config dict to the JSON file"""
@@ -108,21 +109,6 @@ with open("config.json") as f:
     config = json.load(f)
 if my_debug:
     print(f"global(): config: {config}")
-
-# See: https://www.epochconverter.com/
-# Values are for timezone Europe/Portugal
-dst = {
-        2022:(1648342800, 1667095200),  # 2022-03-29 01:00:00 / 2022-10-30 02:00:00
-        2023:(1679792400, 1698544800),  # 2023-03-26 01:00:00 / 2023-10-29 02:00:00
-        2024:(1711846800, 1729994400),  # 2024-03-31 01:00:00 / 2024-10-27 02:00:00
-        2025:(1743296400, 1761444000),  # 2025 03-30 01:00:00 / 2025-10-28 02:00:00
-        2026:(1774746000, 1792893600),  # 2026-03-29 01:00:00 / 2026-10-25 02:00:00
-        2027:(1806195600, 1824948000),  # 2027-03-28 01:00:00 / 2027-10-31 02:00:00
-        2028:(1837645200, 1856397600),  # 2028-03-26 01:00:00 / 2028-10-29 02:00:00
-        2029:(1869094800, 1887847200),  # 2029-03-25 01:00:00 / 2029-10-28 02:00:00
-        2030:(1901149200, 1919296800),  # 2030-03-31 01:00:00 / 2030-10-27 02:00:00
-        2031:(1932598800, 1950746400),  # 2031-03-30 01:00:00 / 2031-10-26 02:00:00
-}
 
 state = None
 
@@ -369,7 +355,7 @@ def read_fm_config(state):
             if k == "is_12hr":
                 state.is_12hr = v
             if k == "UTC_OFFSET":
-                state.UTC_OFFSET = v * 3600
+                state.UTC_OFFSET = v
             if k == "tmzone":
                 state.tm_tmzone = v
     if my_debug:
@@ -547,6 +533,65 @@ def can_update_fm_NTP(state):
             time.sleep(2)  # we have to wait 15 seconds
     return ret
 
+def is_dst(state, tm):
+    global dst_offset, ntp
+    TAG= tag_adj(state, "is_dst(): ")
+    
+    dst_org = dst_offset # get original value
+    
+    if not tm[state.tm_year] in dst.keys():
+        print("year: {} not in dst dictionary ({}).\nUpdate the dictionary! Exiting...".format(tm[state.tm_year], dst.keys()))
+        raise SystemExit
+    else:
+        dst_start_end = dst[tm[state.tm_year]]
+    if my_debug:
+        print(TAG+f"dst_start_end: {dst_start_end}")
+    cur_dt = time.localtime()
+    dst_start1 =  dst_start_end[0]
+    dst_end1 = dst_start_end[1]
+    dst_start2 = time.localtime(dst_start1)
+    dst_end2 = time.localtime(dst_end1)
+    if not my_debug:
+        print(TAG+"dst_start1:   {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format( \
+            dst_start2[state.tm_year], \
+            dst_start2[state.tm_mon], \
+            dst_start2[state.tm_mday], \
+            dst_start2[state.tm_hour], \
+            dst_start2[state.tm_min], \
+            dst_start2[state.tm_sec]))
+        print(TAG+"current date: {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format( \
+            cur_dt[state.tm_year], \
+            cur_dt[state.tm_mon], \
+            cur_dt[state.tm_mday], \
+            cur_dt[state.tm_hour], \
+            cur_dt[state.tm_min], \
+            cur_dt[state.tm_sec]))
+        print(TAG+"dst_end1:     {:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format( \
+            dst_end2[state.tm_year], \
+            dst_end2[state.tm_mon], \
+            dst_end2[state.tm_mday], \
+            dst_end2[state.tm_hour], \
+            dst_end2[state.tm_min], \
+            dst_end2[state.tm_sec]))
+
+    if my_debug:
+        print(TAG+f"year: {tm[state.tm_year]}, dst start: {dst_start2}, dst end: {dst_end2}")
+    current_time = time.time()
+    if current_time > dst_start1 and current_time < dst_end1:
+        dst_new = 1
+    else:
+        dst_new = 0
+        
+    if dst_new != dst_org:
+        state.dst = dst_new
+        ntp = None
+        ntp = adafruit_ntp.NTP(pool, tz_offset = state.UTC_OFFSET if state.dst else 0)
+    
+    if not my_debug:
+        # print(TAG+f"state.dst: {state.dst}")
+        s = 'Yes' if state.dst == 1 else 'No'
+        print(TAG+f"Are we in daylight saving time for country: \'{state.COUNTRY}\', state: \'{state.STATE}\' ? {s}")
+
 
 def set_time(state):
     global config
@@ -624,9 +669,9 @@ def set_time(state):
                         print(TAG+"mcp now is running")
                 else:
                     print(TAG+"mcp is running")
-            if not tm[state.tm_year] in dst.keys():
-                print("year: {} not in dst dictionary ({}).\nUpdate the dictionary! Exiting...".format(tm[state.tm_year], dst.keys()))
-                raise SystemExit
+                    
+            is_dst(state, tm)
+            
             if state.set_SYS_RTC:
                 if not state.SYS_RTC_is_set:
                     tm2 = (tm[state.tm_year], tm[state.tm_mon], tm[state.tm_mday], tm[state.tm_wday] + 1,
@@ -801,7 +846,7 @@ def add_12hr(t):
 
 def get_hours12(hh):
     ret = hh
-    if hh >= 12:
+    if hh > 12:
         ret = hh - 12
     return ret
 
@@ -879,14 +924,14 @@ def upd_SRAM(state):
     #        month,
     #        date)
 
+    ampm = get_ampm(hours)
+    
     if state.dt_str_usa:
         if is_12hr:
             hours12 = get_hours12(hours)
-
             if my_debug:
                 print(TAG+f"hours: {hours}, minutes: {minutes}, seconds: {seconds}, is_12hr: {is_12hr}")
             if hours >= 0 and hours < 24 and minutes >= 1 and minutes < 60 and seconds >= 1 and seconds < 60:
-                ampm = get_ampm(hours)
                 dt2 = "{:d}:{:02d}:{:02d} {}".format(
                 hours12,
                 minutes,
@@ -917,7 +962,7 @@ def upd_SRAM(state):
     if is_PM:
         dt7 = "is_PM: {}".format(is_PM)
     else:
-        dt7 = "is_PM: {}".format(ampm)
+        dt7 = "is_PM: {}".format(mcp._is_PM(hours))
 
     msg = ["Write to SRAM:", dt1, dt2, dt3, dt6, dt7]
     pr_msg(state, msg)
@@ -954,7 +999,7 @@ def upd_SRAM(state):
 
         rdl = "received datetime stamp length: {:d}".format(num_registers-1)
         yearday = mcp.yearday(res[1:])  # slice off byte 0 (= num_registers)
-        isdst = -1
+        isdst = state.dst
 
         if my_debug:
             print(TAG+f"{rdl}")
@@ -967,6 +1012,8 @@ def upd_SRAM(state):
             _, year, month, date, weekday, hours, minutes, seconds, is_12hr, is_PM = res # don't use nr_bytes again
 
         year += 2000
+        
+        ampm = get_ampm(hours)
 
         # weekday += 1  # Correct for mcp weekday is 1 less than NTP or time.localtime weekday
         if month >= 1 and month <= 12:  # prevent key error
@@ -986,8 +1033,6 @@ def upd_SRAM(state):
                 year)
 
         if is_12hr:
-            ampm = get_ampm(hours+12)
-
             if hours >= 0 and hours < 24 and minutes >= 1 and minutes < 60 and seconds >= 1 and seconds < 60:
                 dt2 = "{:d}:{:02d}:{:02d} {}".format(
                 hours,
@@ -1022,7 +1067,7 @@ def upd_SRAM(state):
         if is_PM:
             dt7 = "is_PM: {}".format(is_PM)
         else:
-            dt7 = "is_PM: {}".format(ampm)
+            dt7 = "is_PM: {}".format(mcp._is_PM(hours))
 
         msg = ["Read from SRAM:", dt1, dt2, dt3, dt6, dt7, "Added: ", dt4, dt5]
 
@@ -1076,11 +1121,11 @@ def pr_dt(state, short, choice):
         print(TAG+f"state.dt_str_usa: {state.dt_str_usa}")
     if mcp._is_12hr:
         ampm = get_ampm(hh)
-        if hh >= 12:
+        if hh > 12:
             hh -= 12
 
-        if hh == 0:
-            hh = 12
+        #if hh == 0:
+        #    hh = 12
 
         #dt1 = "{:d}/{:02d}/{:02d}".format(mm, dd, yy)
         dt1 = "{:s} {:02d} {:02d}".format(state.month_dict[mm], dd, yy)
@@ -1692,7 +1737,7 @@ def say_hello(header):
  * @return None
 """
 def setup(state):
-    global pixels, config
+    global pixels, config, dst_offset, ntp, pool
     TAG = tag_adj(state, "setup(): ")
     s_mcp = "MCP7940"
     s_pf1 = s_mcp+" Power failed"
@@ -1705,6 +1750,15 @@ def setup(state):
     color_index = 0
 
     print(TAG+f"board: \'{state.board_id}\'")
+
+    state.dst = dst_offset # copy the global value into the state class attribute
+    
+    read_fm_config(state)
+    
+    ntp = adafruit_ntp.NTP(pool, tz_offset = state.UTC_OFFSET)  # tz_offset e.g.: -4, 0, 1, 12
+    pool = None
+    if ntp and my_debug:
+        print(TAG+f"ntp object {type(ntp)} created")
 
     wifi.AuthMode.WPA2   # set only once
     do_connect(state)
@@ -1909,7 +1963,7 @@ def main():
     if my_debug:
         print("Waiting another 5 seconds for mu-editor etc. getting ready")
     time.sleep(5)
-    read_fm_config(state)
+
     setup(state)
     if my_debug:
         print("Entering loop")
