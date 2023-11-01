@@ -1,5 +1,6 @@
 # See: https://www.epochconverter.com/
-# Values are for timezone Europe/Portugal
+# See also: https://www.timeanddate.com/time/zones/
+# Values are for timezone 'Europe/Portugal'
 dst = {
         2022:(1648342800, 1667095200),  # 2022-03-29 01:00:00 / 2022-10-30 02:00:00
         2023:(1679792400, 1698544800),  # 2023-03-26 01:00:00 / 2023-10-29 02:00:00
