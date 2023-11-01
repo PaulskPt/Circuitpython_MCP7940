@@ -300,13 +300,15 @@ mcp = mcp7940.MCP7940(i2c)
 
 def interrupt_handler(state):  # (pin):
     TAG = tag_adj(state, "interrupt_handler(): ")
+    ret = False
     if state.mfp:  # We have an interrupt!
         print(TAG+"RING RING RING we have an interrupt from the RTC shield!")
         alarm_blink(state)
         clr_alarm(state, 1)
         mcp._clr_ALMxIF_bit(1) # Clear the interrupt
         state.mfp = False
-        raise KeyboardInterrupt
+        ret = True
+    return ret
 
 # rtc_mfp_int.irq(handler=interrupt_handler, trigger=Pin.IRQ_RISING)
 
@@ -2076,7 +2078,8 @@ def main():
                     show_alm_int_status(state)
                 pol_alarm_int(state)  # Check alarm interrupt
                 if state.alarm1_int:
-                    interrupt_handler(state)
+                    if interrupt_handler(state):
+                        raise KeyboardInterrupt
                 # pol_alarm_int(state)  # Check alarm interrupt
                 # ------------------------------------------------------------------------------------------------
         except KeyboardInterrupt:
@@ -2086,6 +2089,7 @@ def main():
             pixels[0] = ( r, g, b, state.neopixel_brightness)
             pixels.write()
             print("KeyboardInterrupt. Exiting...")
+            print()
             sys.exit()
         except Exception as e:
             print("Error", e)
