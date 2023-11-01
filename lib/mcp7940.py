@@ -322,10 +322,10 @@ class MCP7940:
             (2019, 6, 3, 13, 12, 44, 0, 154)
             # 1:12:44pm on Monday (0) the 3 Jun 2019 (154th day of the year)
         """
-        if not my_debug:
+        if my_debug:
             print(TAG+f"setter: param t_in: {t_in}. len(t_in): {len(t_in)}")
         t_in = t_in[:7]  # Slice off too many bytes
-        if not my_debug:
+        if my_debug:
             print(TAG+f"t_in (cut): {t_in}")
         year, month, date, hours, minutes, seconds, weekday = t_in  # skip yearday
         # Reorder
@@ -360,7 +360,7 @@ class MCP7940:
         for _ in range(len(t)):
             out_buf.append(t[_])
         in_buf = bytearray(len(out_buf)-1)
-        if not my_debug:
+        if my_debug:
             print(TAG+f"to send to MCP7940, buffer: {out_buf}, len(buffer): {len(out_buf)}")
 
         # Note that some fields will be overwritten that are important!
@@ -385,11 +385,6 @@ class MCP7940:
         # correct the fact that setting a new time clears the 12/24hr bit
         if self._is_12hr:
             self.set_12hr(self._is_12hr)
-        
-        
-        # correct the fact that setting a new time clears the 12/24hr bit
-        #if self._is_12hr:
-        #    self.set_12hr(self._is_12hr)
         # --------------------------------------------------------------------------------------
         
     # Return state of the self.time_is_set flag
