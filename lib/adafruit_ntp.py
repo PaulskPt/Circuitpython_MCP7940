@@ -82,10 +82,10 @@ class NTP:
         sock = None
         try_cnt = 0
         stop = False
-        TAG = "NTP.datetime: "
+        TAG = "NTP.datetime():           "
         while True:
             if my_debug:
-                print(f"ntp.datetime(): self._server: \'{self._server}\'")
+                print(TAG+f"self._server: \'{self._server}\'")
             """Current time from NTP server. Accessing this property causes the NTP time request,
             unless there has already been a recent request. Raises OSError exception if no response
             is received within socket_timeout seconds"""
