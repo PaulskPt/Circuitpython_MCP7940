@@ -2090,7 +2090,7 @@ def main():
             pixels.write()
             print("KeyboardInterrupt. Exiting...")
             print()
-            wifi.radio.stop_station()
+            # wifi.radio.stop_station()
             sys.exit()
         except Exception as e:
             print("Error", e)
@@ -2098,4 +2098,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
