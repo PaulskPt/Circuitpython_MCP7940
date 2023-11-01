@@ -42,7 +42,6 @@ import wifi
 import ipaddress
 import socketpool
 import rtc
-#from busio import I2C
 import displayio
 import rtc
 import mcp7940
@@ -76,15 +75,18 @@ import adafruit_ntp
 pool = socketpool.SocketPool(wifi.radio)
 ntp = None  # See setup
 
-def save_config():
-    """function to save the config dict to the JSON file"""
+state = None
+
+"""function to save the config dict to the JSON file"""
+def save_config(state):
+    TAG = "save_config():"+" "*12
     ret = 0
     try:
         with open("config.json", "w") as f:
             json.dump(config, f)
         ret = 1
     except OSError as e:
-        print(f"save_config(): Error: {e}")
+        print(TAG+f"Error: {e}")
         return ret
     return ret
 
@@ -95,8 +97,6 @@ with open("config.json") as f:
     config = json.load(f)
 if my_debug:
     print(f"global(): config: {config}")
-
-state = None
 
 class State:
     def __init__(self, saved_state_json=None):
@@ -351,7 +351,7 @@ def read_fm_config(state):
     if my_debug:
         print(TAG+f"for check:\n\tstate.COUNTRY: \'{state.COUNTRY}\', state.STATE: \'{state.STATE}\', state.UTC_OFFSET: {state.UTC_OFFSET}, state.tm_tmzone: \'{state.tm_tmzone}\'")
 
-save_config()
+save_config(state)
 
 def is_NTP(state):
     TAG = tag_adj(state, "is_NTP(): ")
@@ -642,7 +642,9 @@ def set_time(state):
             ths = mcp.time_has_set()
             print(TAG+f"mcp.time_has_set(): {ths}")
             if not ths:
-                print(TAG+f"setting MCP7940 timekeeping regs to:\n\t\t{tm}")
+                print(TAG+f"setting MCP7940 timekeeping regs to:")
+                s = " "*len(TAG)
+                print(s+f"{tm}")
                 #if MCP7940_RTC_update:
                 #gc.collect()
                 #-----------------------------------------------------------
@@ -1816,7 +1818,7 @@ def setup(state):
         # Check the value set
         is12hr = mcp._is_12hr
         config["is_12hr"] = is12hr  # save to json
-        save_config()
+        save_config(state)
     else:
         print(TAG+"setting mcp._is_12hr failed")
 
