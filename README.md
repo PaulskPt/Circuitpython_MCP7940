@@ -15,3 +15,5 @@ You can change the values for your timezone. See: `https://www.epochconverter.co
 In `Example 2`, in file `config.json` added item `Use_dst`, default to `1`. In `Class State` added attributes: `self.use_dst`, and `self.dst`. I updated function `is_dst()` accordingly.
 If one doesn't want to use `dst`, then set `Use_dst` in file `config.json` to `0`. If one wants to use `dst`, set `Use_dst` to `1` and set `UTC_OFFSET` to the number of hours that your timezone differs from UTC (positive or negative),
 and set item `tmzone` to a text value of your timezone, in my case for Portugal: `Europe/Lisbon`.
+
+In the folder: `Example_ProS3` I added a file `dst_USA_NY.py`. The file I used to create it is in folder `/doc/ProS3`: `USA_NY_2022-2031_DST_EPOCH_values.xlsx`. They can be used as an example to create dst `EPOCH values` for the period `2022-2031`.
