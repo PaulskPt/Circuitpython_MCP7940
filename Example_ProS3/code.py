@@ -2083,13 +2083,14 @@ def main():
                 # pol_alarm_int(state)  # Check alarm interrupt
                 # ------------------------------------------------------------------------------------------------
         except KeyboardInterrupt:
-            wifi.radio.stop_station()
+
             r,g,b = pros3.rgb_color_wheel( state.BLK )
             state.curr_color_set == state.BLK
             pixels[0] = ( r, g, b, state.neopixel_brightness)
             pixels.write()
             print("KeyboardInterrupt. Exiting...")
             print()
+            wifi.radio.stop_station()
             sys.exit()
         except Exception as e:
             print("Error", e)
