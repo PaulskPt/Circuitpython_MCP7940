@@ -9,7 +9,7 @@ When a 'match' interrupt occurs, the NEOPIXEL led will flash alternatively red a
 
 ## Update 2023-10-31:
 In Example 2 added a file `dst.py` which contains the dst start and end `EPOCH values for the years 2022 - 2031`. In the current example the file `dst.py` contains the dst values for `timezone 'Europe/Portugal'`.
-You can change the values for your timezone. See: `https://www.epochconverter.com/`
+You can change the values for your timezone. See: `https://www.epochconverter.com/`. The file I used to create it is in folder `/doc/ProS3`: `EUR_PT_2022-2031_DST_EPOCH_values.xlsx`
 
 ## Update 2023-11-01:
 In `Example 2`, in file `config.json` added item `Use_dst`, default to `1`. In `Class State` added attributes: `self.use_dst`, and `self.dst`. I updated function `is_dst()` accordingly.
