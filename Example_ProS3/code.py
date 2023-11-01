@@ -1,4 +1,3 @@
-
 # SPDX-FileCopyrightText: 2023 Paulus Schulinck
 #
 # SPDX-License-Identifier: MIT
@@ -21,7 +20,7 @@
     Update October 2023:
 
     The script tries to establish WiFi and when successfull it will fetch a datetime stamp from the Adafruit NTP server.
-    Depending of the global boolean variables: 'state.set_SYS_RTC' and 'state.set_EXT_RTC', the internal and/or the external RTC(s)
+    Depending of the State Class boolean variables: 'state.set_SYS_RTC' and 'state.set_EXT_RTC', the internal and/or the external RTC(s)
     is/are set.
 
     The external MCP7940 RTC timekeeping set values will be read frequently.
@@ -30,20 +29,9 @@
     The MCP7940 RTC needs only to be set when the RTC has been without power or not has been set before.
     When you need more (debug) output to the REPL, set the global variable 'my_debug' to True.
 
-    Note that NTP weekday starts with 0. Also time.localtime element tm_wday ranges 0-6 while MCP7940 weekday range is 1-7.
-    For this reason we use a mRTC_DOW dictionary in the State Class in this file and
-    Then in three places corrections are performed:
-    a DOW dictionary in the MCP7940 Class in the file lib/mcp7940.py.
-    a) In function set_EXT_RTC() we do the following:
-        dt = time.localtime()
-        state.dt_dict[state.wd] = dt.tm_wday + 1
-    b) In function set_alarm() we do the following:
-        t1 = time.time()  # get seconds since epoch
-        dt = time.localtime(t1+(mins_fm_now*60)) # convert mins_fm_now to seconds
-        weekday = dt.tm_wday + 1
-    c) In function upd_SRAM(), after reading the datetime stamp from SRAM we add a correction:
-        weekday += 1
-
+    A dst.py file has been added. Its contents will be read at startup.
+    Currently dst dictionary in the dst.py file contains dst values for timezone 'Europe/Portugal'. You can change these value for your timezone.
+    The State Class attribute state.dst will be set also according to the value of config.json UTC_OFFSET.
     Want to see more of my work: Github @PaulskPt
 
 """
@@ -1804,7 +1792,7 @@ def setup(state):
             print(TAG+f"my_countries_dst: {my_countries_dst}")
         ntp = None
         ntp = adafruit_ntp.NTP(pool, tz_offset = my_countries_dst)  # tz_offset e.g.: -4, 0, 1, 12
-        
+        pool = None
         
         set_time(state)  # call at start
         gc.collect()
