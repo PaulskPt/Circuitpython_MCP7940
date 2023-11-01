@@ -1,4 +1,4 @@
-Wednesday 2023-11-01 13h04 utc
+Wednesday 2023-11-01 13h51 utc
 
 
 Board: Unexpected Maker ESP32S3 ProS3
@@ -31,27 +31,27 @@ setup():                  setting MCP7940.is_12hr to: True
 setup():                  MCP7950 datetime format: 12hr
 ntp.datetime(): self._server: '2.pt.pool.ntp.org'
 setup():                  Using dst? Yes
-is_dst():                 time.localtime(): struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=5, tm_sec=5, tm_wday=2, tm_yday=305, tm_isdst=-1)
+is_dst():                 time.localtime(): struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=51, tm_sec=12, tm_wday=2, tm_yday=305, tm_isdst=-1)
 is_dst():                 dst_start1:   2023-03-26 01:00:00
-is_dst():                 current date: 2023-11-01 13:05:05
+is_dst():                 current date: 2023-11-01 13:51:12
 is_dst():                 dst_end1:     2023-10-29 02:00:00
 is_dst():                 Are we in daylight saving time for country: 'PRT', state: '' ? No
 setup():                  my_country_dst: 0
 ntp.datetime(): self._server: '2.pt.pool.ntp.org'
-set_time():               dt: struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=5, tm_sec=5, tm_wday=2, tm_yday=305, tm_isdst=-1), len(dt): 9
+set_time():               dt: struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=51, tm_sec=13, tm_wday=2, tm_yday=305, tm_isdst=-1), len(dt): 9
 set_time():               Succeeded to update the builtin RTC from an NTP server
-set_time():               Updating ntp_last_sync_dt to: 1698843905
+set_time():               Updating ntp_last_sync_dt to: 1698846673
 set_time():               mcp.time_has_set(): False
 set_time():               setting MCP7940 timekeeping regs to:
-		struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=5, tm_sec=5, tm_wday=2, tm_yday=305, tm_isdst=-1)
-MCP7940.mcptime() setter: 23/11/1 13:5:5 (weekday 2 = Wednesday)
+		struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=51, tm_sec=13, tm_wday=2, tm_yday=305, tm_isdst=-1)
+MCP7940.mcptime() setter: 23/11/1 13:51:13 (weekday 2 = Wednesday)
 set_time():               mcp is running
-is_dst():                 time.localtime(): struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=5, tm_sec=5, tm_wday=2, tm_yday=305, tm_isdst=-1)
+is_dst():                 time.localtime(): struct_time(tm_year=2023, tm_mon=11, tm_mday=1, tm_hour=13, tm_min=51, tm_sec=13, tm_wday=2, tm_yday=305, tm_isdst=-1)
 is_dst():                 dst_start1:   2023-03-26 01:00:00
-is_dst():                 current date: 2023-11-01 13:05:05
+is_dst():                 current date: 2023-11-01 13:51:13
 is_dst():                 dst_end1:     2023-10-29 02:00:00
 is_dst():                 Are we in daylight saving time for country: 'PRT', state: '' ? No
-set_time():               builtin RTC set to: (2023, 11, 1, 3, 13, 5, 5, 0, 0)
+set_time():               builtin RTC set to: (2023, 11, 1, 3, 13, 51, 13, 0, 0)
 setup():                  setting MCP7940 for 12hr time format
 save_config(): Error: [Errno 30] Read-only filesystem
 setup():                  We have an internal RTC
@@ -61,7 +61,7 @@ setup():                  Checking for MCP7940 power failure.
 ntp.datetime(): self._server: '2.pt.pool.ntp.org'
 set_INT_RTC():            Internal (SYS) RTC is set from NTP service datetime stamp: 
 set_INT_RTC():            11/01/2023
-set_INT_RTC():            13:05:06 weekday: Wednesday
+set_INT_RTC():            13:51:14 weekday: Wednesday
 set_INT_RTC():            Note that NTP weekday starts with 0 while MCP7940 weekday starts with 1
 
 setup():                  start setting up MCP7940
@@ -75,8 +75,8 @@ main():                   connected to "Vodafone-xxxxxx"!
 main():                   IP address is 192.168.x.xxx
 hostname():               wifi.radio.hostname= 'UMProS3'
 mac():                    wifi.radio.mac_address= f4:12:fa:42:4:ec
-ping_test():              Resolved google address: '142.250.200.142'
-ping_test():              Ping google.com [142.250.200.142]: 15 ms
+ping_test():              Resolved google address: '142.250.200.110'
+ping_test():              Ping google.com [142.250.200.110]: 15 ms
 
 
 
@@ -88,7 +88,7 @@ ping_test():              Ping google.com [142.250.200.142]: 15 ms
 
 NTP date:
 Wed Nov 01 2023
-1:05:08 PM
+1:51:17 PM
 
 
 
@@ -117,12 +117,14 @@ main():                   Demo nr 1 of 2: save to and then read from the RTC shi
 
 Write to SRAM:
 Nov 01 2023
-1:05:21 PM
+1:51:29 PM
 wkday: Wednesday
 is_12hr: 1
 is_PM: 1
 
 
+upd_SRAM():               we're going to write (23, 11, 1, 13, 51, 29, 2, 1, 1) to the RTC shield's SRAM
+upd_SRAM():               hours: 13, ampm: PM
 
 
 
@@ -134,7 +136,7 @@ is_PM: 1
 
 Read from SRAM:
 Nov 01 2023
-1:05:21 AM
+1:51:29 PM
 wkday: Wednesday
 is_12hr: 1
 is_PM: 1
@@ -155,12 +157,14 @@ main():                   Demo nr 2 of 2: save to and then read from the RTC shi
 
 Write to SRAM:
 Nov 01 2023
-1:05:33 PM
+1:51:41 PM
 wkday: Wednesday
 is_12hr: 1
 is_PM: 1
 
 
+upd_SRAM():               we're going to write (23, 11, 1, 13, 51, 41, 2, 1, 1) to the RTC shield's SRAM
+upd_SRAM():               hours: 13, ampm: PM
 
 
 
@@ -172,7 +176,7 @@ is_PM: 1
 
 Read from SRAM:
 Nov 01 2023
-1:05:33 AM
+1:51:41 PM
 wkday: Wednesday
 is_12hr: 1
 is_PM: 1
@@ -197,16 +201,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 5, 40, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 51, 48, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    5   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   51   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 4
@@ -228,16 +232,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 5, 46, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 51, 54, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    5   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   51   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 5
@@ -259,16 +263,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 5, 52, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 0, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    5   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 6
@@ -290,16 +294,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 5, 58, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 7, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    5   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 7
@@ -321,16 +325,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 5, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 13, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 8
@@ -352,16 +356,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 11, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 19, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 9
@@ -383,16 +387,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 17, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 26, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 10
@@ -414,16 +418,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 24, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 32, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 11
@@ -445,16 +449,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 30, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 39, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 12
@@ -476,16 +480,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 37, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 45, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 13
@@ -507,16 +511,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 43, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 51, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 14
@@ -538,50 +542,19 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 49, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 52, 57, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   52   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 
 main():                   loop nr: 15
-
-MCP7940 MFP output mode:
-+--------+--------+--------+--------------------------+
-| SQWEN  | ALM0EN | ALM1EN |          Mode            |
-+--------+--------+--------+--------------------------+
-|   0    |   1    |   0    | Alarm Interruput output  |
-+--------+--------+--------+--------------------------+
-See: MCP7940N datasheet DS20005010H-page 25
-
-
-Single alarm output truth table for alarm1:
-+--------+---------+-------+----------------------------------+
-| ALMPOL |  ALM1IF |  MFP  |            Match type            |
-+--------+---------+-------+----------------------------------+
-|   1    |    0    |   0   | mask bits: 'b001' type: minute   |
-+--------+---------+-------+----------------------------------+
-See: MCP7940N datasheet DS20005010H-page 27
-
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 6, 56, 2)
-
-Alarm interrupt status:
-Expect next alarm at minute: 7
-+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
-+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    6   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
-+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | No                  | ALARM1 SET FOR     |
-+-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-
-main():                   loop nr: 16
 
 MCP7940 MFP output mode:
 +--------+--------+--------+--------------------------+
@@ -600,16 +573,16 @@ Single alarm output truth table for alarm1:
 +--------+---------+-------+----------------------------------+
 See: MCP7940N datasheet DS20005010H-page 27
 
-show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 7, 2, 2)
+show_alm_int_status():    mcp.mcptime: (2023, 11, 1, 13, 53, 4, 2)
 
 Alarm interrupt status:
-Expect next alarm at minute: 7
+Expect next alarm at minute: 53
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 |  ALARM  Nr  | ENABLED? | MONTH | DAY | HOUR | MINUTE | AM/PM  | WEEKDAY | INTERRUPT OCCURRED? | NOTES:             |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      X      |    X     |  11   |   1 |   1  |    7   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
+|      X      |    X     |  11   |   1 |   1  |   53   |   PM   |   Wed   | X                   | CURRENT DATETIME   |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
-|      1      |   Yes    |  11   |   1 |   1  |    7   |   PM   |   Wed   | Yes                 | ALARM1 SET FOR     |
+|      1      |   Yes    |  11   |   1 |   1  |   53   |   PM   |   Wed   | Yes                 | ALARM1 SET FOR     |
 +-------------+----------+-------+-----+------+--------+--------+---------+---------------------+--------------------+
 interrupt_handler():      RING RING RING we have an interrupt from the RTC shield!
 alarm_blink():            blinking: RED
@@ -626,7 +599,4 @@ KeyboardInterrupt. Exiting...
 
 Code done running.
 
-Press any key to enter the REPL. Use CTRL-D to reload.
-
 Adafruit CircuitPython 9.0.0-alpha.2-5-g6b62df4054 on 2023-10-29; ProS3 with ESP32S3
->>> [D
