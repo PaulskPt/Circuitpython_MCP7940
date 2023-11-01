@@ -29,9 +29,16 @@
     The MCP7940 RTC needs only to be set when the RTC has been without power or not has been set before.
     When you need more (debug) output to the REPL, set the global variable 'my_debug' to True.
 
+    If one wants to use dst then set the value of key 'Use_dst' in file config.json to 1.
     A dst.py file has been added. Its contents will be read at startup.
     Currently dst dictionary in the dst.py file contains dst values for timezone 'Europe/Portugal'. You can change these value for your timezone.
     The State Class attribute state.dst will be set also according to the value of config.json UTC_OFFSET.
+    A file 'USA_NY_dst.py' has been added containing a dst dictionary containing EST/EDT EPOCH values for the period 2022-2031.
+    If one wants to use the 'USA_NY_dst.py' file I suggest: 1) rename file 'dst.py' to 'dst_original.py'; 2) make a copy of file 
+    'USA_NY_dst.py' and rename it to 'dst.py'.
+    In the folder /docs/ProS3 is an Excel file named: 'USA_NY_2022-2031_DST_EPOCH_values.xlsx'.
+    This Excel file I filled with dates, times and EPOCH values for USA, state NY.
+    The EPOCH values from this Excel file I then copied to create the file 'USA_NY_dst.py'.
     Want to see more of my work: Github @PaulskPt
 
 """
@@ -2098,3 +2105,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
