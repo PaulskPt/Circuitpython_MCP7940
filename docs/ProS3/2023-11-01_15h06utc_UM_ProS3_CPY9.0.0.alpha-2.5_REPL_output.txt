@@ -97,25 +97,3 @@ KeyboardInterrupt. Exiting...
 
 Code done running.
 
-Adafruit CircuitPython 9.0.0-alpha.2-5-g6b62df4054 on 2023-10-29; ProS3 with ESP32S3
-
-
-
-
-
-
-
-NTP date:
-Wed Nov 01 2023
-3:03:08 PM
-
-
-
-
-
-KeyboardInterrupt. Exiting...
-
-Code done running.
-
-Adafruit CircuitPython 9.0.0-alpha.2-5-g6b62df4054 on 2023-10-29; ProS3 with ESP32S3
-Code done running.
